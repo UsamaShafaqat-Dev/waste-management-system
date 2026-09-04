@@ -15,7 +15,13 @@ const app = express();
 // ==========================================
 // MIDDLEWARES
 // ==========================================
-app.use(cors({ origin: "http://localhost:5173", credentials: true })); // Frontend URL
+app.use(cors({
+    origin: [
+        "http://localhost:5173", 
+        "https://waste-management-system-jx3i.vercel.app" // Aapka live Vercel link
+    ],
+    credentials: true
+}));
 app.use(express.json()); // Allow JSON data
 app.use(cookieParser()); // Fixed: Removed the spaces
 
