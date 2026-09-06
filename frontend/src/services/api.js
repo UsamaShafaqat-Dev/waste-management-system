@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // 🚨 YAHAN APNA ASLI RENDER WALA LINK LIKHEIN:
-const API_URL = "waste-management-backend.onrender.com/api";
+const API_URL = "https://waste-management-backend.onrender.com/api";
 
 const api = axios.create({
   baseURL: API_URL,
