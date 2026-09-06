@@ -15,12 +15,15 @@ const app = express();
 // ==========================================
 // MIDDLEWARES
 // ==========================================
+
+
+// Apne backend ke server.js ya app.js mein yeh replace karein:
 app.use(cors({
-    origin: [
-        "http://localhost:5173", 
-        "https://waste-management-system-jx3i.vercel.app" // Aapka live Vercel link
-    ],
-    credentials: true
+  origin: [
+    "http://localhost:5173", // Local testing ke liye
+    "https://waste-management-system-jx3i.vercel.app" // Aap ka Asli Vercel Link
+  ],
+  credentials: true, // Yeh lazmi hai withCredentials wale frontend ke liye
 }));
 app.use(express.json()); // Allow JSON data
 app.use(cookieParser()); // Fixed: Removed the spaces
