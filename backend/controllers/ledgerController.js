@@ -6,17 +6,39 @@ const Shop = require("../models/Shop");
 // @route   POST /api/ledger/payments
 const addPayment = async (req, res) => {
   try {
-    const { shopId, date, amount, paymentMethod, notes } = req.body;
+    const { shopId, date, amount, paymentType, paymentMethod, notes } =
+      req.body;
 
     const payment = await Payment.create({
       shop: shopId,
       date,
       amount,
+      paymentType: paymentType || "Debit",
       paymentMethod,
       notes,
     });
 
     res.status(201).json(payment);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Edit an existing payment (ADMIN ONLY)
+// @route   PUT /api/ledger/payments/:id
+const editPayment = async (req, res) => {
+  try {
+    const { date, amount, paymentType, paymentMethod, notes } = req.body;
+
+    const payment = await Payment.findByIdAndUpdate(
+      req.params.id,
+      { date, amount, paymentType, paymentMethod, notes },
+      { new: true },
+    );
+
+    if (!payment) return res.status(404).json({ message: "Payment not found" });
+
+    res.status(200).json(payment);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -28,37 +50,39 @@ const getShopLedger = async (req, res) => {
   try {
     const shopId = req.params.shopId;
 
-    // 1. Get Shop Details
     const shop = await Shop.findById(shopId).populate(
       "assignedRoute",
       "routeName",
     );
     if (!shop) return res.status(404).json({ message: "Shop not found" });
 
-    // 2. Get all collections (Credit)
     const collections = await DailyCollection.find({ shop: shopId }).sort({
       date: 1,
     });
-
-    // 3. Get all payments (Debit)
     const payments = await Payment.find({ shop: shopId }).sort({ date: 1 });
 
-    // 4. Calculate Totals
     const totalCollectedKg = collections.reduce(
       (sum, item) => sum + item.weightKg,
       0,
     );
-    const totalPayableAmount = collections.reduce(
+
+    // Total Payable (Credit): Waste Amount + Any Credit Payments
+    const wastePayable = collections.reduce(
       (sum, item) => sum + item.amount,
       0,
-    ); // Credit
-    const totalPaidAmount = payments.reduce(
-      (sum, item) => sum + item.amount,
-      0,
-    ); // Debit
+    );
+    const creditPayments = payments
+      .filter((p) => p.paymentType === "Credit")
+      .reduce((sum, item) => sum + item.amount, 0);
+    const totalPayableAmount = wastePayable + creditPayments;
+
+    // Total Paid (Debit)
+    const totalPaidAmount = payments
+      .filter((p) => p.paymentType === "Debit" || !p.paymentType)
+      .reduce((sum, item) => sum + item.amount, 0);
+
     const remainingBalance = totalPayableAmount - totalPaidAmount;
 
-    // Combine history for timeline view
     res.status(200).json({
       shopDetails: shop,
       summary: {
@@ -75,4 +99,4 @@ const getShopLedger = async (req, res) => {
   }
 };
 
-module.exports = { addPayment, getShopLedger };
+module.exports = { addPayment, editPayment, getShopLedger };

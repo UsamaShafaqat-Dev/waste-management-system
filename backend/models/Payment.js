@@ -15,6 +15,11 @@ const paymentSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    paymentType: {
+      type: String,
+      enum: ["Debit", "Credit"],
+      default: "Debit", // Default debit hi rahega
+    },
     paymentMethod: {
       type: String,
       enum: ["Cash", "Check", "Bank Transfer", "Other"],
@@ -24,8 +29,6 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    // To identify user who entered the payment (Staff/Admin)
-    // user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' } // Ye hum auth lagane ke baad link kar lenge
   },
   {
     timestamps: true,

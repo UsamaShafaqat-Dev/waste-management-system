@@ -10,32 +10,30 @@ import {
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
+import { LanguageContext } from "../context/LanguageContext"; // Hook Add Kiya
 
 const Settings = () => {
-  const { user, login } = useContext(AuthContext); // Real logged-in user data
+  const { user, login } = useContext(AuthContext);
+  const { t, language } = useContext(LanguageContext); // Translation Nikali
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
 
-  // Profile State
   const [profileData, setProfileData] = useState({
     name: "",
     email: "",
   });
 
-  // Password State
   const [passwordData, setPasswordData] = useState({
     newPassword: "",
     confirmPassword: "",
   });
 
-  // System State (Local for now)
   const [systemData, setSystemData] = useState({
     currency: "Rs",
     timezone: "Asia/Karachi",
     notifications: true,
   });
 
-  // Pre-fill user data when component loads
   useEffect(() => {
     if (user) {
       setProfileData({
@@ -45,7 +43,6 @@ const Settings = () => {
     }
   }, [user]);
 
-  // 1. UPDATE PROFILE IN DATABASE
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -53,7 +50,6 @@ const Settings = () => {
       const { data } = await api.put(`/users/${user._id}`, profileData);
       toast.success("Profile updated successfully!");
 
-      // Update local storage & Context with new name/email
       const updatedUser = { ...user, name: data.name, email: data.email };
       login(updatedUser);
     } catch (error) {
@@ -63,7 +59,6 @@ const Settings = () => {
     }
   };
 
-  // 2. CHANGE PASSWORD IN DATABASE
   const handlePasswordUpdate = async (e) => {
     e.preventDefault();
 
@@ -76,7 +71,6 @@ const Settings = () => {
 
     setLoading(true);
     try {
-      // Backend automatically hashes/updates if password is provided
       await api.put(`/users/${user._id}`, {
         password: passwordData.newPassword,
       });
@@ -92,7 +86,6 @@ const Settings = () => {
     }
   };
 
-  // 3. SYSTEM PREFERENCES (Local Storage)
   const handleSystemUpdate = (e) => {
     e.preventDefault();
     setLoading(true);
@@ -104,41 +97,48 @@ const Settings = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-3">
+    <div
+      className={`space-y-6 ${language === "ur" ? "text-right" : "text-left"}`}
+    >
+      <div
+        className={`bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
+      >
         <div className="p-3 bg-gray-100 text-gray-700 rounded-lg">
           <SettingsIcon size={24} />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-gray-800">System Settings</h1>
-          <p className="text-sm text-gray-500">
-            Manage your account, security, and application preferences
+          <h1 className="text-xl font-bold text-gray-800">
+            {t("System Settings")}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {t("Manage your account, security, and application preferences")}
           </p>
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6">
+      <div
+        className={`flex flex-col md:flex-row gap-6 ${language === "ur" ? "md:flex-row-reverse" : ""}`}
+      >
         {/* Settings Sidebar */}
         <div className="w-full md:w-64 bg-white rounded-xl shadow-sm border border-gray-100 p-4 h-max">
           <nav className="space-y-2">
             <button
               onClick={() => setActiveTab("profile")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === "profile" ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50"}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === "profile" ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50"} ${language === "ur" ? "flex-row-reverse" : ""}`}
             >
-              <User size={18} /> My Profile
+              <User size={18} /> {t("My Profile")}
             </button>
             <button
               onClick={() => setActiveTab("security")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === "security" ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50"}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === "security" ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50"} ${language === "ur" ? "flex-row-reverse" : ""}`}
             >
-              <Lock size={18} /> Security & Password
+              <Lock size={18} /> {t("Security & Password")}
             </button>
             <button
               onClick={() => setActiveTab("system")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === "system" ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50"}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === "system" ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50"} ${language === "ur" ? "flex-row-reverse" : ""}`}
             >
-              <Globe size={18} /> System Preferences
+              <Globe size={18} /> {t("System Preferences")}
             </button>
           </nav>
         </div>
@@ -148,8 +148,10 @@ const Settings = () => {
           {/* Profile Tab */}
           {activeTab === "profile" && (
             <div>
-              <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <User className="text-green-600" /> Personal Information
+              <h2
+                className={`text-lg font-bold text-gray-800 mb-6 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
+              >
+                <User className="text-green-600" /> {t("Personal Information")}
               </h2>
               <form
                 onSubmit={handleProfileUpdate}
@@ -157,7 +159,7 @@ const Settings = () => {
               >
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">
-                    Full Name
+                    {t("Full Name")}
                   </label>
                   <input
                     type="text"
@@ -166,12 +168,12 @@ const Settings = () => {
                       setProfileData({ ...profileData, name: e.target.value })
                     }
                     required
-                    className="w-full border rounded-lg px-4 py-2 outline-none focus:border-green-500"
+                    className={`w-full border rounded-lg px-4 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
                   />
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">
-                    Email Address
+                    {t("Email Address")}
                   </label>
                   <input
                     type="email"
@@ -180,16 +182,17 @@ const Settings = () => {
                       setProfileData({ ...profileData, email: e.target.value })
                     }
                     required
-                    className="w-full border rounded-lg px-4 py-2 outline-none focus:border-green-500"
+                    className={`w-full border rounded-lg px-4 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
                   />
                 </div>
                 <div className="pt-4">
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
+                    className={`flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
                   >
-                    <Save size={18} /> {loading ? "Saving..." : "Save Changes"}
+                    <Save size={18} />{" "}
+                    {loading ? t("Saving...") : t("Save Changes")}
                   </button>
                 </div>
               </form>
@@ -199,19 +202,21 @@ const Settings = () => {
           {/* Security Tab */}
           {activeTab === "security" && (
             <div>
-              <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <Lock className="text-green-600" /> Change Password
+              <h2
+                className={`text-lg font-bold text-gray-800 mb-6 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
+              >
+                <Lock className="text-green-600" /> {t("Change Password")}
               </h2>
               <form
                 onSubmit={handlePasswordUpdate}
                 className="space-y-4 max-w-lg"
               >
                 <p className="text-sm text-gray-500 mb-4">
-                  Set a new strong password for your account.
+                  {t("Set a new strong password for your account.")}
                 </p>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">
-                    New Password
+                    {t("New Password")}
                   </label>
                   <input
                     type="password"
@@ -224,13 +229,13 @@ const Settings = () => {
                     }
                     required
                     minLength="6"
-                    className="w-full border rounded-lg px-4 py-2 outline-none focus:border-green-500"
+                    className={`w-full border rounded-lg px-4 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
                     placeholder="••••••••"
                   />
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">
-                    Confirm New Password
+                    {t("Confirm New Password")}
                   </label>
                   <input
                     type="password"
@@ -243,7 +248,7 @@ const Settings = () => {
                     }
                     required
                     minLength="6"
-                    className="w-full border rounded-lg px-4 py-2 outline-none focus:border-green-500"
+                    className={`w-full border rounded-lg px-4 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
                     placeholder="••••••••"
                   />
                 </div>
@@ -251,10 +256,10 @@ const Settings = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
+                    className={`flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-6 py-2.5 rounded-lg font-medium transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
                   >
                     <Lock size={18} />{" "}
-                    {loading ? "Updating..." : "Update Password"}
+                    {loading ? t("Updating...") : t("Update Password")}
                   </button>
                 </div>
               </form>
@@ -264,8 +269,10 @@ const Settings = () => {
           {/* System Tab */}
           {activeTab === "system" && (
             <div>
-              <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <Globe className="text-green-600" /> System Preferences
+              <h2
+                className={`text-lg font-bold text-gray-800 mb-6 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
+              >
+                <Globe className="text-green-600" /> {t("System Preferences")}
               </h2>
               <form
                 onSubmit={handleSystemUpdate}
@@ -273,39 +280,47 @@ const Settings = () => {
               >
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">
-                    Currency Symbol
+                    {t("Currency Symbol")}
                   </label>
                   <select
                     value={systemData.currency}
                     onChange={(e) =>
                       setSystemData({ ...systemData, currency: e.target.value })
                     }
-                    className="w-full border rounded-lg px-4 py-2 outline-none focus:border-green-500"
+                    className={`w-full border rounded-lg px-4 py-2 outline-none focus:border-green-500 bg-white ${language === "ur" ? "text-right" : "text-left"}`}
                   >
-                    <option value="Rs">PKR (Rs)</option>
-                    <option value="$">USD ($)</option>
+                    <option value="Rs">{t("PKR (Rs)")}</option>
+                    <option value="$">{t("USD ($)")}</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">
-                    Timezone
+                    {t("Timezone")}
                   </label>
                   <input
                     type="text"
                     value={systemData.timezone}
                     readOnly
-                    className="w-full border rounded-lg px-4 py-2 outline-none bg-gray-50 text-gray-500 cursor-not-allowed"
+                    className={`w-full border rounded-lg px-4 py-2 outline-none bg-gray-50 text-gray-500 cursor-not-allowed ${language === "ur" ? "text-right" : "text-left"}`}
                   />
                 </div>
 
-                <div className="flex items-center justify-between border-t pt-4">
-                  <div>
-                    <p className="font-medium text-gray-800 flex items-center gap-2">
-                      <Bell size={16} /> Email Notifications
+                <div
+                  className={`flex items-center justify-between border-t pt-4 ${language === "ur" ? "flex-row-reverse" : ""}`}
+                >
+                  <div
+                    className={language === "ur" ? "text-right" : "text-left"}
+                  >
+                    <p
+                      className={`font-medium text-gray-800 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
+                    >
+                      <Bell size={16} /> {t("Email Notifications")}
                     </p>
-                    <p className="text-sm text-gray-500">
-                      Receive alerts for deleted records or large shortages.
+                    <p className="text-sm text-gray-500 mt-1">
+                      {t(
+                        "Receive alerts for deleted records or large shortages.",
+                      )}
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
@@ -328,10 +343,10 @@ const Settings = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
+                    className={`flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
                   >
                     <Save size={18} />{" "}
-                    {loading ? "Saving..." : "Save Preferences"}
+                    {loading ? t("Saving...") : t("Save Preferences")}
                   </button>
                 </div>
               </form>

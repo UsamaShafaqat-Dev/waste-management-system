@@ -3,9 +3,12 @@ import { Store, Plus, Trash2, Edit, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
+import { LanguageContext } from "../context/LanguageContext"; // Language Context
 
 const Shops = () => {
   const { user } = useContext(AuthContext);
+  const { t, language } = useContext(LanguageContext); // Translation Hook
+
   const [shopsList, setShopsList] = useState([]);
   const [routesList, setRoutesList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -35,6 +38,7 @@ const Shops = () => {
       toast.error("Failed to fetch data");
     }
   };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -77,7 +81,7 @@ const Shops = () => {
     setFormData({
       shopName: shop.shopName,
       ownerName: shop.ownerName,
-      contact: shop.contact,
+      contact: shop.contact || "",
       address: shop.address || "",
       assignedRoute: shop.assignedRoute ? shop.assignedRoute._id : "",
       ratePerKg: shop.ratePerKg,
@@ -100,41 +104,51 @@ const Shops = () => {
   };
 
   return (
-    <div className="space-y-6 relative">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+    <div
+      className={`space-y-6 relative w-full ${language === "ur" ? "text-right" : "text-left"}`}
+    >
+      {/* Header */}
+      <div
+        className={`flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 gap-4 ${language === "ur" ? "md:flex-row-reverse" : ""}`}
+      >
         <div>
-          <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <Store className="text-cyan-600" /> Shops Management
+          <h1
+            className={`text-xl font-bold text-gray-800 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
+          >
+            <Store className="text-cyan-600" /> {t("Shops Management")}
           </h1>
         </div>
         {user?.role === "Admin" && (
           <button
             onClick={() => setShowForm(!showForm)}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+            className={`w-full md:w-auto bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-2 hover:bg-green-700 transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
           >
             {showForm ? (
-              "Cancel"
+              t("Cancel")
             ) : (
               <>
-                <Plus size={18} /> Add Shop
+                <Plus size={18} /> {t("Add Shop")}
               </>
             )}
           </button>
         )}
       </div>
 
+      {/* Add / Edit Form */}
       {showForm && user?.role === "Admin" && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold mb-4">
-            {editId ? "Edit Shop" : "Add New Shop"}
+        <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-100">
+          <h2
+            className={`text-lg font-semibold mb-4 text-gray-800 ${language === "ur" ? "text-right" : "text-left"}`}
+          >
+            {editId ? t("Edit Shop") : t("Add New Shop")}
           </h2>
           <form
             onSubmit={handleSubmit}
-            className="grid grid-cols-1 md:grid-cols-3 gap-4"
+            className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${language === "ur" ? "text-right" : "text-left"}`}
           >
             <div>
               <label className="block text-sm text-gray-600 mb-1">
-                Shop Name *
+                {t("Shop Name *")}
               </label>
               <input
                 type="text"
@@ -142,12 +156,12 @@ const Shops = () => {
                 value={formData.shopName}
                 onChange={handleChange}
                 required
-                className="w-full border rounded-lg px-3 py-2 outline-none"
+                className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
               />
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">
-                Owner Name *
+                {t("Owner Name *")}
               </label>
               <input
                 type="text"
@@ -155,34 +169,34 @@ const Shops = () => {
                 value={formData.ownerName}
                 onChange={handleChange}
                 required
-                className="w-full border rounded-lg px-3 py-2 outline-none"
+                className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
               />
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">
-                Contact *
+                {t("Contact (Optional)")}
               </label>
               <input
                 type="text"
                 name="contact"
                 value={formData.contact}
                 onChange={handleChange}
-                required
-                className="w-full border rounded-lg px-3 py-2 outline-none"
+                placeholder="e.g. 0300-1234567"
+                className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
               />
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">
-                Assign Route *
+                {t("Assign Route *")}
               </label>
               <select
                 name="assignedRoute"
                 value={formData.assignedRoute}
                 onChange={handleChange}
                 required
-                className="w-full border rounded-lg px-3 py-2 outline-none"
+                className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white ${language === "ur" ? "text-right" : "text-left"}`}
               >
-                <option value="">-- Select Route --</option>
+                <option value="">{t("-- Select Route --")}</option>
                 {routesList.map((r) => (
                   <option key={r._id} value={r._id}>
                     {r.routeName}
@@ -192,119 +206,308 @@ const Shops = () => {
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">
-                Rate per KG (Rs.) *
+                {t("Rate per KG (Rs.) *")}
               </label>
               <input
                 type="number"
                 name="ratePerKg"
+                min="0"
+                step="any"
                 value={formData.ratePerKg}
                 onChange={handleChange}
                 required
-                className="w-full border rounded-lg px-3 py-2 outline-none"
+                className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Status</label>
+              <label className="block text-sm text-gray-600 mb-1">
+                {t("Status")}
+              </label>
               <select
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
-                className="w-full border rounded-lg px-3 py-2 outline-none"
+                className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white ${language === "ur" ? "text-right" : "text-left"}`}
               >
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
+                <option value="Active">{t("Active")}</option>
+                <option value="Inactive">{t("Inactive")}</option>
               </select>
             </div>
-            <div className="md:col-span-3 flex justify-end">
+            <div
+              className={`md:col-span-3 flex ${language === "ur" ? "justify-start" : "justify-end"} mt-2`}
+            >
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg"
+                className={`w-full md:w-auto px-6 py-2.5 rounded-lg text-white font-medium ${loading ? "bg-green-400" : "bg-green-600 hover:bg-green-700"}`}
               >
-                {loading ? "Saving..." : "Save Shop"}
+                {loading ? t("Saving...") : t("Save Shop")}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-left border-collapse min-w-[800px]">
-          <thead>
-            <tr className="bg-gray-50 border-b text-gray-600 text-sm">
-              <th className="px-4 py-3">Shop Name</th>
-              <th className="px-4 py-3">Owner & Contact</th>
-              <th className="px-4 py-3">Assigned Route</th>
-              <th className="px-4 py-3">Rate/KG</th>
-              <th className="px-4 py-3">Status</th>
-              {user?.role === "Admin" && (
-                <th className="px-4 py-3 text-right">Actions</th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {shopsList.map((shop) => (
-              <tr key={shop._id} className="border-b hover:bg-gray-50 text-sm">
-                <td className="px-4 py-3 font-medium">{shop.shopName}</td>
-                <td className="px-4 py-3 text-gray-600">
-                  {shop.ownerName} <br />
-                  <span className="text-xs text-gray-400">{shop.contact}</span>
-                </td>
-                <td className="px-4 py-3 font-medium text-blue-600">
-                  {shop.assignedRoute
-                    ? shop.assignedRoute.routeName
-                    : "Not Assigned"}
-                </td>
-                <td className="px-4 py-3 font-semibold">
-                  Rs. {shop.ratePerKg}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${shop.status === "Active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
-                  >
-                    {shop.status}
-                  </span>
-                </td>
+      {/* Shops Data Container */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* DESKTOP VIEW (Table) */}
+        <div className="hidden md:block overflow-x-auto">
+          <table
+            className={`w-full border-collapse ${language === "ur" ? "text-right" : "text-left"}`}
+          >
+            <thead>
+              <tr className="bg-gray-800 text-white text-sm">
+                <th
+                  className={`px-4 py-4 w-12 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  #
+                </th>
+                <th
+                  className={`px-4 py-4 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  {t("Shop Name")}
+                </th>
+                <th
+                  className={`px-4 py-4 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  {t("Owner & Contact")}
+                </th>
+                <th
+                  className={`px-4 py-4 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  {t("Assigned Route")}
+                </th>
+                <th
+                  className={`px-4 py-4 font-medium ${language === "ur" ? "text-left" : "text-right"}`}
+                >
+                  {t("Rate/KG")}
+                </th>
+                <th
+                  className={`px-4 py-4 font-medium ${language === "ur" ? "text-left" : "text-left"}`}
+                >
+                  {t("Status")}
+                </th>
                 {user?.role === "Admin" && (
-                  <td className="px-4 py-3 text-right">
+                  <th
+                    className={`px-4 py-4 font-medium ${language === "ur" ? "text-left" : "text-right"}`}
+                  >
+                    {t("Actions")}
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {shopsList.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={user?.role === "Admin" ? 7 : 6}
+                    className="text-center py-8 text-gray-500"
+                  >
+                    {t("No shops found. Please add a new shop.")}
+                  </td>
+                </tr>
+              ) : (
+                shopsList.map((shop, index) => (
+                  <tr
+                    key={shop._id}
+                    className="border-b hover:bg-gray-50 text-sm transition-colors"
+                  >
+                    <td
+                      className={`px-4 py-3 font-bold text-gray-500 ${language === "ur" ? "text-right" : "text-left"}`}
+                    >
+                      {index + 1}
+                    </td>
+                    <td
+                      className={`px-4 py-3 font-bold text-gray-800 ${language === "ur" ? "text-right" : "text-left"}`}
+                    >
+                      {shop.shopName}
+                    </td>
+                    <td
+                      className={`px-4 py-3 text-gray-600 ${language === "ur" ? "text-right" : "text-left"}`}
+                    >
+                      {shop.ownerName} <br />
+                      <span className="text-xs text-gray-500">
+                        {shop.contact || "No Contact"}
+                      </span>
+                    </td>
+                    <td
+                      className={`px-4 py-3 font-medium text-blue-600 ${language === "ur" ? "text-right" : "text-left"}`}
+                    >
+                      {shop.assignedRoute
+                        ? shop.assignedRoute.routeName
+                        : "Not Assigned"}
+                    </td>
+                    <td
+                      className={`px-4 py-3 font-semibold text-gray-800 ${language === "ur" ? "text-left" : "text-right"}`}
+                    >
+                      Rs. {shop.ratePerKg}
+                    </td>
+                    <td
+                      className={`px-4 py-3 ${language === "ur" ? "text-left" : "text-left"}`}
+                    >
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-bold ${shop.status === "Active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
+                      >
+                        {t(shop.status)}
+                      </span>
+                    </td>
+                    {user?.role === "Admin" && (
+                      <td
+                        className={`px-4 py-3 ${language === "ur" ? "text-left" : "text-right"}`}
+                      >
+                        <button
+                          onClick={() => handleEdit(shop)}
+                          className={`p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors ${language === "ur" ? "ml-2" : "mr-2"}`}
+                          title={t("Edit")}
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() =>
+                            setDeleteModal({ show: true, id: shop._id })
+                          }
+                          className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                          title={t("Delete")}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* MOBILE VIEW (Cards) */}
+        <div className="md:hidden flex flex-col p-4 gap-4 bg-gray-50">
+          {shopsList.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              {t("No shops found. Please add a new shop.")}
+            </div>
+          ) : (
+            shopsList.map((shop, index) => (
+              <div
+                key={shop._id}
+                className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col gap-3"
+              >
+                <div
+                  className={`flex justify-between items-start border-b border-gray-100 pb-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
+                >
+                  <div>
+                    <span className="text-xs font-bold text-gray-400">
+                      #{index + 1}
+                    </span>
+                    <h3
+                      className={`font-bold text-lg text-gray-800 ${language === "ur" ? "text-right" : "text-left"}`}
+                    >
+                      {shop.shopName}
+                    </h3>
+                  </div>
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-xs font-bold ${shop.status === "Active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
+                  >
+                    {t(shop.status)}
+                  </span>
+                </div>
+
+                <div
+                  className={`grid grid-cols-2 gap-2 text-sm ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  <div
+                    className={`flex flex-col ${language === "ur" ? "items-end" : "items-start"}`}
+                  >
+                    <span className="text-gray-500 text-xs">
+                      {t("Owner & Contact")}
+                    </span>
+                    <span className="font-medium text-gray-800">
+                      {shop.ownerName}
+                    </span>
+                    <span className="text-gray-500 text-xs">
+                      {shop.contact || "N/A"}
+                    </span>
+                  </div>
+                  <div
+                    className={`flex flex-col ${language === "ur" ? "items-start" : "items-end"}`}
+                  >
+                    <span className="text-gray-500 text-xs">
+                      {t("Assigned Route")}
+                    </span>
+                    <span className="font-medium text-blue-600">
+                      {shop.assignedRoute
+                        ? shop.assignedRoute.routeName
+                        : "None"}
+                    </span>
+                  </div>
+                  <div
+                    className={`flex flex-col mt-2 ${language === "ur" ? "items-end" : "items-start"}`}
+                  >
+                    <span className="text-gray-500 text-xs">
+                      {t("Rate/KG")}
+                    </span>
+                    <span className="font-bold text-gray-800">
+                      Rs. {shop.ratePerKg}
+                    </span>
+                  </div>
+                </div>
+
+                {user?.role === "Admin" && (
+                  <div
+                    className={`flex justify-end gap-2 pt-3 border-t border-gray-100 mt-1 ${language === "ur" ? "flex-row-reverse" : ""}`}
+                  >
                     <button
                       onClick={() => handleEdit(shop)}
-                      className="p-1 text-blue-600 mr-2"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg font-medium text-sm hover:bg-blue-100 ${language === "ur" ? "flex-row-reverse" : ""}`}
                     >
-                      <Edit size={16} />
+                      <Edit size={16} /> {t("Edit")}
                     </button>
                     <button
                       onClick={() =>
                         setDeleteModal({ show: true, id: shop._id })
                       }
-                      className="p-1 text-red-600"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg font-medium text-sm hover:bg-red-100 ${language === "ur" ? "flex-row-reverse" : ""}`}
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={16} /> {t("Delete")}
                     </button>
-                  </td>
+                  </div>
                 )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              </div>
+            ))
+          )}
+        </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
       {deleteModal.show && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
-            <div className="text-center">
-              <h3 className="text-xl font-bold mb-4">Delete Shop?</h3>
-              <div className="flex gap-3">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <div className="text-center flex flex-col items-center">
+              <div className="h-14 w-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
+                <AlertTriangle size={28} />
+              </div>
+              <h3 className="text-xl font-bold mb-2 text-gray-800">
+                {t("Delete Shop?")}
+              </h3>
+              <p className="text-gray-500 text-sm mb-6">
+                {t(
+                  "Are you sure you want to delete this shop? This action cannot be undone.",
+                )}
+              </p>
+              <div
+                className={`flex gap-3 w-full ${language === "ur" ? "flex-row-reverse" : ""}`}
+              >
                 <button
                   onClick={() => setDeleteModal({ show: false })}
-                  className="flex-1 py-2 bg-gray-100 rounded-xl"
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors"
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
                 <button
                   onClick={executeDelete}
-                  className="flex-1 py-2 bg-red-600 text-white rounded-xl"
+                  className="flex-1 py-2.5 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 transition-colors shadow-sm"
                 >
-                  Delete
+                  {t("Yes, Delete")}
                 </button>
               </div>
             </div>
@@ -314,4 +517,5 @@ const Shops = () => {
     </div>
   );
 };
+
 export default Shops;

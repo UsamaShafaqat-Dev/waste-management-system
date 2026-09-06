@@ -1,7 +1,8 @@
 import { useState, useContext } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { AuthContext } from "../context/AuthContext"; // Naya context import kiya
+import { AuthContext } from "../context/AuthContext";
+import { LanguageContext } from "../context/LanguageContext"; // Naya Context Import Kiya
 import {
   Menu,
   X,
@@ -19,6 +20,7 @@ import {
   Bell,
   LogOut,
   Leaf,
+  Globe,
 } from "lucide-react";
 
 const Layout = () => {
@@ -26,36 +28,54 @@ const Layout = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Context se asli User ka data aur logout function nikal liya
   const { user, logout } = useContext(AuthContext);
+  // Language Context se language aur translation function (t) nikal liya
+  const { language, setLanguage, t } = useContext(LanguageContext);
 
-  // Pura Menu List (Kuch items sirf Admin ke liye hain)
   const allMenuItems = [
     {
       path: "/dashboard",
       name: "Dashboard",
       icon: <LayoutDashboard size={20} />,
+      adminOnly: true,
     },
-    { path: "/vehicles", name: "Vehicles", icon: <Truck size={20} /> },
-    { path: "/routes", name: "Routes", icon: <Map size={20} /> },
-    { path: "/shops", name: "Shops", icon: <Store size={20} /> },
+    {
+      path: "/vehicles",
+      name: "Vehicles",
+      icon: <Truck size={20} />,
+      adminOnly: true,
+    },
+    {
+      path: "/routes",
+      name: "Routes",
+      icon: <Map size={20} />,
+      adminOnly: true,
+    },
+    {
+      path: "/shops",
+      name: "Shops",
+      icon: <Store size={20} />,
+      adminOnly: true,
+    },
     {
       path: "/daily-collection",
       name: "Daily Collection",
       icon: <ClipboardList size={20} />,
+      adminOnly: true,
     },
     {
       path: "/factory-weight",
       name: "Factory Weight",
       icon: <Factory size={20} />,
+      adminOnly: true,
     },
     { path: "/shop-ledger", name: "Shop Ledger", icon: <BookOpen size={20} /> },
     {
       path: "/route-ledger",
       name: "Route Ledger Summary",
       icon: <Book size={20} />,
+      adminOnly: true,
     },
-    // Yeh 3 options sirf Admin ko show hongi (adminOnly: true)
     {
       path: "/monthly-reports",
       name: "Monthly Reports",
@@ -76,22 +96,18 @@ const Layout = () => {
     },
   ];
 
-  // Agar user 'Staff' hai toh Admin wale options filter (hide) kar do
   const menuItems = allMenuItems.filter((item) => {
-    if (item.adminOnly && user?.role !== "Admin") {
-      return false;
-    }
+    if (item.adminOnly && user?.role !== "Admin") return false;
     return true;
   });
 
   const handleLogout = () => {
-    logout(); // Context wala logout chalega
+    logout();
     toast.success("Logged out successfully");
   };
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden font-sans">
-      {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
@@ -103,7 +119,6 @@ const Layout = () => {
       <aside
         className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-gray-900 text-white transition-transform duration-300 ease-in-out transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col`}
       >
-        {/* Brand Logo in Sidebar */}
         <div className="flex items-center gap-2 p-5 border-b border-gray-800">
           <Leaf className="text-green-500" size={32} />
           <div>
@@ -111,12 +126,11 @@ const Layout = () => {
               WASTE
             </h1>
             <p className="text-[10px] text-green-500 font-semibold tracking-widest uppercase">
-              Management System
+              {t("Management System")}
             </p>
           </div>
         </div>
 
-        {/* Sidebar Links */}
         <div className="flex-1 overflow-y-auto py-4">
           <ul className="space-y-1 px-3">
             {menuItems.map((item) => (
@@ -131,25 +145,25 @@ const Layout = () => {
                   }`}
                 >
                   {item.icon}
-                  <span className="text-sm font-medium">{item.name}</span>
+                  {/* Yahan 't' function use kiya hai translation ke liye */}
+                  <span className="text-sm font-medium">{t(item.name)}</span>
                 </Link>
               </li>
             ))}
           </ul>
         </div>
 
-        {/* Bottom Section (Environment Quote & Logout) */}
         <div className="p-4 border-t border-gray-800 space-y-4">
           <div className="bg-gray-800 rounded-lg p-3 flex items-center gap-2 text-green-400 text-xs">
             <Leaf size={16} />
-            <span>Keep Environment Clean For Better Tomorrow</span>
+            <span>{t("Keep Environment Clean")}</span>
           </div>
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 px-3 py-2 w-full text-left text-red-400 hover:bg-gray-800 hover:text-red-300 rounded-lg transition-colors"
           >
             <LogOut size={20} />
-            <span className="text-sm font-medium">Logout</span>
+            <span className="text-sm font-medium">{t("Logout")}</span>
           </button>
         </div>
       </aside>
@@ -166,29 +180,35 @@ const Layout = () => {
               <Menu size={24} className="text-gray-700" />
             </button>
             <h2 className="text-xl font-semibold text-gray-800 hidden sm:block">
-              {menuItems.find((item) => item.path === location.pathname)
-                ?.name || "Dashboard"}
+              {t(
+                menuItems.find((item) => item.path === location.pathname)
+                  ?.name || "Dashboard",
+              )}
             </h2>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Current Date */}
+          <div className="flex items-center gap-3 md:gap-4">
+            {/* 🌐 LANGUAGE DROPDOWN BUTTON 🌐 */}
+            <div className="flex items-center bg-gray-100 rounded-lg px-2 py-1">
+              <Globe size={16} className="text-gray-500 mr-2" />
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="bg-transparent text-sm font-medium text-gray-700 outline-none cursor-pointer"
+              >
+                <option value="en">English</option>
+                <option value="ur">اردو (Urdu)</option>
+              </select>
+            </div>
+
             <div className="hidden md:flex items-center text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg">
               {new Date().toLocaleDateString("en-GB", {
                 day: "numeric",
                 month: "long",
                 year: "numeric",
-                weekday: "long",
               })}
             </div>
 
-            {/* Notifications */}
-            <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-full transition">
-              <Bell size={20} />
-              <span className="absolute top-1 right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
-
-            {/* Dynamic User Profile Menu */}
             <div className="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-gray-100 rounded-lg transition border border-gray-200">
               <div className="h-8 w-8 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-sm uppercase">
                 {user?.name ? user.name.charAt(0) : "U"}

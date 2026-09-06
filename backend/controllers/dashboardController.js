@@ -1,44 +1,62 @@
+const mongoose = require("mongoose");
 const Vehicle = require("../models/Vehicle");
 const Route = require("../models/Route");
 const Shop = require("../models/Shop");
 const DailyCollection = require("../models/DailyCollection");
+const FactoryWeight = require("../models/FactoryWeight");
 
 // @desc    Get dashboard statistics
 // @route   GET /api/dashboard
 const getDashboardStats = async (req, res) => {
   try {
+    const { date, route } = req.query;
+
     const totalVehicles = await Vehicle.countDocuments({ status: "Active" });
     const totalRoutes = await Route.countDocuments({ status: "Active" });
     const totalShops = await Shop.countDocuments({ status: "Active" });
 
-    // Today's collection calculation
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    const matchQuery = {};
 
-    const todaysCollections = await DailyCollection.aggregate([
-      { $match: { date: { $gte: today, $lte: endOfDay } } },
-      {
-        $group: {
-          _id: null,
-          totalWeight: { $sum: "$weightKg" },
-          totalAmount: { $sum: "$amount" },
-        },
-      },
+    // 1. EXACT DATE MATCH LOGIC
+    if (date && date !== "All" && date !== "undefined" && date !== "") {
+      const startDate = new Date(`${date}T00:00:00.000Z`);
+      const endDate = new Date(`${date}T23:59:59.999Z`);
+      matchQuery.date = { $gte: startDate, $lte: endDate };
+    }
+
+    // 2. ROUTE MATCH LOGIC
+    if (route && route !== "All" && route !== "undefined" && route !== "") {
+      if (mongoose.Types.ObjectId.isValid(route)) {
+        matchQuery.route = new mongoose.Types.ObjectId(route);
+      }
+    }
+
+    // 3. Calculate Shop Weight
+    const shopCollections = await DailyCollection.aggregate([
+      { $match: matchQuery },
+      { $group: { _id: null, totalWeight: { $sum: "$weightKg" } } },
     ]);
+    const totalShopWeight =
+      shopCollections.length > 0 ? shopCollections[0].totalWeight : 0;
 
-    const todayWeight =
-      todaysCollections.length > 0 ? todaysCollections[0].totalWeight : 0;
-    const todayAmount =
-      todaysCollections.length > 0 ? todaysCollections[0].totalAmount : 0;
+    // 4. Calculate Factory Weight
+    const factoryCollections = await FactoryWeight.aggregate([
+      { $match: matchQuery },
+      { $group: { _id: null, totalWeight: { $sum: "$factoryWeight" } } },
+    ]);
+    const totalFactoryWeight =
+      factoryCollections.length > 0 ? factoryCollections[0].totalWeight : 0;
+
+    // 5. Difference
+    const totalDifference = totalShopWeight - totalFactoryWeight;
 
     res.status(200).json({
       totalVehicles,
       totalRoutes,
       totalShops,
-      todayWeight,
-      todayAmount,
+      totalShopWeight,
+      totalFactoryWeight,
+      totalDifference,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -3,9 +3,12 @@ import { Truck, Plus, Trash2, Edit, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
+import { LanguageContext } from "../context/LanguageContext"; // Translation Hook
 
 const Vehicles = () => {
-  const { user } = useContext(AuthContext); // User details li hain
+  const { user } = useContext(AuthContext);
+  const { t, language } = useContext(LanguageContext);
+
   const [vehiclesList, setVehiclesList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -90,17 +93,22 @@ const Vehicles = () => {
   };
 
   return (
-    <div className="space-y-6 relative">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+    <div
+      className={`space-y-6 relative ${language === "ur" ? "text-right" : "text-left"}`}
+    >
+      <div
+        className={`flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 ${language === "ur" ? "flex-row-reverse" : ""}`}
+      >
         <div>
-          <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <Truck className="text-green-600" /> Vehicles Management
+          <h1
+            className={`text-xl font-bold text-gray-800 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
+          >
+            <Truck className="text-green-600" /> {t("Vehicles Management")}
           </h1>
-          <p className="text-sm text-gray-500">
-            Manage all your transport vehicles
+          <p className="text-sm text-gray-500 mt-1">
+            {t("Manage all your transport vehicles")}
           </p>
         </div>
-        {/* ADD BUTTON - ONLY FOR ADMIN */}
         {user?.role === "Admin" && (
           <button
             onClick={
@@ -111,13 +119,13 @@ const Vehicles = () => {
                   }
                 : () => setShowForm(true)
             }
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors"
+            className={`bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
           >
             {showForm ? (
-              "Cancel"
+              t("Cancel")
             ) : (
               <>
-                <Plus size={18} /> Add Vehicle
+                <Plus size={18} /> {t("Add Vehicle")}
               </>
             )}
           </button>
@@ -126,16 +134,18 @@ const Vehicles = () => {
 
       {showForm && user?.role === "Admin" && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold mb-4">
-            {editId ? "Edit Vehicle" : "Add New Vehicle"}
+          <h2
+            className={`text-lg font-semibold mb-4 ${language === "ur" ? "text-right" : "text-left"}`}
+          >
+            {editId ? t("Edit Vehicle") : t("Add New Vehicle")}
           </h2>
           <form
             onSubmit={handleSubmit}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${language === "ur" ? "text-right" : "text-left"}`}
           >
             <div>
               <label className="block text-sm text-gray-600 mb-1">
-                Vehicle Number *
+                {t("Vehicle Number *")}
               </label>
               <input
                 type="text"
@@ -143,26 +153,26 @@ const Vehicles = () => {
                 value={formData.vehicleNumber}
                 onChange={handleChange}
                 required
-                className="w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500"
+                className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
                 placeholder="e.g. AP-001"
               />
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">
-                Vehicle Name/Type
+                {t("Vehicle Name/Type")}
               </label>
               <input
                 type="text"
                 name="vehicleName"
                 value={formData.vehicleName}
                 onChange={handleChange}
-                className="w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500"
+                className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
                 placeholder="e.g. Shehzore"
               />
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">
-                Driver Name *
+                {t("Driver Name *")}
               </label>
               <input
                 type="text"
@@ -170,13 +180,13 @@ const Vehicles = () => {
                 value={formData.driverName}
                 onChange={handleChange}
                 required
-                className="w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500"
+                className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
                 placeholder="Driver Name"
               />
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">
-                Driver Contact *
+                {t("Driver Contact *")}
               </label>
               <input
                 type="text"
@@ -184,34 +194,40 @@ const Vehicles = () => {
                 value={formData.driverContact}
                 onChange={handleChange}
                 required
-                className="w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500"
+                className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
                 placeholder="0300-0000000"
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Status</label>
+              <label className="block text-sm text-gray-600 mb-1">
+                {t("Status")}
+              </label>
               <select
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
-                className="w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500"
+                className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500 bg-white ${language === "ur" ? "text-right" : "text-left"}`}
               >
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Under Maintenance">Under Maintenance</option>
+                <option value="Active">{t("Active")}</option>
+                <option value="Inactive">{t("Inactive")}</option>
+                <option value="Under Maintenance">
+                  {t("Under Maintenance")}
+                </option>
               </select>
             </div>
-            <div className="lg:col-span-3 flex justify-end">
+            <div
+              className={`lg:col-span-3 flex ${language === "ur" ? "justify-start" : "justify-end"}`}
+            >
               <button
                 type="submit"
                 disabled={loading}
                 className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors"
               >
                 {loading
-                  ? "Saving..."
+                  ? t("Saving...")
                   : editId
-                    ? "Update Vehicle"
-                    : "Save Vehicle"}
+                    ? t("Update Vehicle")
+                    : t("Save Vehicle")}
               </button>
             </div>
           </form>
@@ -220,18 +236,47 @@ const Vehicles = () => {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table
+            className={`w-full border-collapse ${language === "ur" ? "text-right" : "text-left"}`}
+          >
             <thead>
               <tr className="bg-gray-50 border-b text-gray-600 text-sm">
-                <th className="px-4 py-3 font-medium">Vehicle No.</th>
-                <th className="px-4 py-3 font-medium">Name/Type</th>
-                <th className="px-4 py-3 font-medium">Driver</th>
-                <th className="px-4 py-3 font-medium">Contact</th>
-                <th className="px-4 py-3 font-medium">Assigned Route</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                {/* ACTION HEADER - ONLY FOR ADMIN */}
+                <th
+                  className={`px-4 py-3 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  {t("Vehicle No.")}
+                </th>
+                <th
+                  className={`px-4 py-3 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  {t("Name/Type")}
+                </th>
+                <th
+                  className={`px-4 py-3 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  {t("Driver")}
+                </th>
+                <th
+                  className={`px-4 py-3 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  {t("Contact")}
+                </th>
+                <th
+                  className={`px-4 py-3 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  {t("Assigned Route")}
+                </th>
+                <th
+                  className={`px-4 py-3 font-medium ${language === "ur" ? "text-left" : "text-left"}`}
+                >
+                  {t("Status")}
+                </th>
                 {user?.role === "Admin" && (
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
+                  <th
+                    className={`px-4 py-3 font-medium ${language === "ur" ? "text-left" : "text-right"}`}
+                  >
+                    {t("Actions")}
+                  </th>
                 )}
               </tr>
             </thead>
@@ -256,20 +301,22 @@ const Vehicles = () => {
                   <td className="px-4 py-3 font-medium text-blue-600">
                     {vehicle.assignedRoute
                       ? vehicle.assignedRoute.routeName
-                      : "Not Assigned"}
+                      : t("Not Assigned")}
                   </td>
                   <td className="px-4 py-3">
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${vehicle.status === "Active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
                     >
-                      {vehicle.status}
+                      {t(vehicle.status)}
                     </span>
                   </td>
-
-                  {/* ACTIONS - ONLY FOR ADMIN */}
                   {user?.role === "Admin" && (
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-2">
+                    <td
+                      className={`px-4 py-3 ${language === "ur" ? "text-left" : "text-right"}`}
+                    >
+                      <div
+                        className={`flex gap-2 ${language === "ur" ? "justify-start" : "justify-end"}`}
+                      >
                         <button
                           onClick={() => handleEdit(vehicle)}
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded"
@@ -302,20 +349,27 @@ const Vehicles = () => {
                 <AlertTriangle size={32} />
               </div>
               <h3 className="text-xl font-bold text-gray-800 mb-2">
-                Delete Vehicle?
+                {t("Delete Vehicle?")}
               </h3>
-              <div className="flex gap-3 w-full mt-4">
+              <p className="text-gray-500 text-sm mb-6">
+                {t(
+                  "Are you sure you want to delete this shop? This action cannot be undone.",
+                )}
+              </p>
+              <div
+                className={`flex gap-3 w-full mt-4 ${language === "ur" ? "flex-row-reverse" : ""}`}
+              >
                 <button
                   onClick={() => setDeleteModal({ show: false, id: null })}
                   className="flex-1 px-4 py-2 bg-gray-100 rounded-xl hover:bg-gray-200"
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
                 <button
                   onClick={executeDelete}
                   className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700"
                 >
-                  Yes, Delete
+                  {t("Yes, Delete")}
                 </button>
               </div>
             </div>

@@ -7,19 +7,16 @@ const Route = require("../models/Route");
 const getShopTotalWeight = async (req, res) => {
   try {
     const { date, routeId } = req.query;
-
-    if (!date || !routeId) {
+    if (!date || !routeId)
       return res
         .status(400)
         .json({ message: "Date and Route ID are required" });
-    }
 
     const queryDate = new Date(date);
     queryDate.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Fetch all shop collections for this route on this date
     const collections = await DailyCollection.find({
       route: routeId,
       date: { $gte: queryDate, $lte: endOfDay },
@@ -34,12 +31,11 @@ const getShopTotalWeight = async (req, res) => {
         });
     }
 
-    // Calculate total weight
     const totalShopWeight = collections.reduce(
       (sum, item) => sum + item.weightKg,
       0,
     );
-    const vehicle = collections[0].vehicle; // Extract assigned vehicle from collection
+    const vehicle = collections[0].vehicle;
 
     res.status(200).json({ totalShopWeight, vehicle });
   } catch (error) {
@@ -59,7 +55,6 @@ const createFactoryWeight = async (req, res) => {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Check for double entry
     const existingEntry = await FactoryWeight.findOne({
       route,
       date: { $gte: entryDate, $lte: endOfDay },
@@ -73,7 +68,6 @@ const createFactoryWeight = async (req, res) => {
         });
     }
 
-    // Auto Calculate Difference and Status[cite: 1]
     const difference = factoryWeight - totalShopWeight;
     let status = "Balanced";
     if (difference > 0) status = "Extra";
@@ -104,4 +98,63 @@ const createFactoryWeight = async (req, res) => {
   }
 };
 
-module.exports = { getShopTotalWeight, createFactoryWeight };
+// @desc    Get Factory Weights (History / Monthly Report)
+// @route   GET /api/factory-weights
+const getFactoryWeights = async (req, res) => {
+  try {
+    const { month, date } = req.query;
+    let matchQuery = {};
+
+    if (date) {
+      const queryDate = new Date(date);
+      matchQuery.date = {
+        $gte: new Date(queryDate.setHours(0, 0, 0, 0)),
+        $lte: new Date(queryDate.setHours(23, 59, 59, 999)),
+      };
+    } else if (month) {
+      const [year, m] = month.split("-");
+      const startDate = new Date(year, m - 1, 1);
+      const endDate = new Date(year, m, 0, 23, 59, 59, 999);
+      matchQuery.date = { $gte: startDate, $lte: endDate };
+    }
+
+    const history = await FactoryWeight.find(matchQuery)
+      .populate("route", "routeName")
+      .populate("vehicle", "vehicleNumber driverName")
+      .sort({ date: -1 });
+
+    res.status(200).json(history);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Update Factory Weight
+// @route   PUT /api/factory-weights/:id
+const updateFactoryWeight = async (req, res) => {
+  try {
+    const { factoryWeight, notes } = req.body;
+    const record = await FactoryWeight.findById(req.params.id);
+    if (!record) return res.status(404).json({ message: "Record not found" });
+
+    record.factoryWeight = factoryWeight;
+    record.notes = notes;
+    record.difference = factoryWeight - record.totalShopWeight;
+
+    if (record.difference > 0) record.status = "Extra";
+    else if (record.difference < 0) record.status = "Shortage";
+    else record.status = "Balanced";
+
+    await record.save();
+    res.status(200).json(record);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = {
+  getShopTotalWeight,
+  createFactoryWeight,
+  getFactoryWeights,
+  updateFactoryWeight,
+};
