@@ -1,14 +1,14 @@
 import axios from "axios";
 
-// 🚨 YAHAN APNA ASLI RENDER WALA LINK LIKHEIN:
-const API_URL = "https://waste-management-system-jx3i.vercel.app";
+// Aap ka Asli aur Final Render Link
+const API_URL = "https://waste-management-system-yw9w.onrender.com/api";
 
 const api = axios.create({
   baseURL: API_URL,
-  withCredentials: true, // For sending cookies/tokens securely
+  withCredentials: true, // Secure login ke liye
 });
 
-// Yeh hissa laazmi hai taake login token backend tak jaye
+// Token bhejne wala hissa
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) {
