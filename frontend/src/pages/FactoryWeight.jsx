@@ -13,12 +13,12 @@ import {
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
-import { LanguageContext } from "../context/LanguageContext"; // Language Context
+import { LanguageContext } from "../context/LanguageContext";
 import * as XLSX from "xlsx";
 
 const FactoryWeight = () => {
   const { user } = useContext(AuthContext);
-  const { t, language } = useContext(LanguageContext); // Translation Hook
+  const { t, language } = useContext(LanguageContext);
 
   const [routes, setRoutes] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -34,6 +34,7 @@ const FactoryWeight = () => {
 
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [filterMonth, setFilterMonth] = useState(currentMonth);
+  const [filterRoute, setFilterRoute] = useState(""); // 🔥 NAYA: Report filter by route
   const [historyData, setHistoryData] = useState([]);
 
   const [editModal, setEditModal] = useState({ show: false, data: null });
@@ -54,7 +55,11 @@ const FactoryWeight = () => {
 
   const fetchHistory = async () => {
     try {
-      const { data } = await api.get(`/factory-weights?month=${filterMonth}`);
+      // 🔥 NAYA: Route filter API me bheja ja raha hai
+      let url = `/factory-weights?month=${filterMonth}`;
+      if (filterRoute) url += `&routeId=${filterRoute}`;
+
+      const { data } = await api.get(url);
       setHistoryData(data);
     } catch (error) {
       toast.error("Failed to fetch history");
@@ -63,7 +68,7 @@ const FactoryWeight = () => {
 
   useEffect(() => {
     fetchHistory();
-  }, [filterMonth]);
+  }, [filterMonth, filterRoute]); // Route change honay pe bhi API call hogi
 
   useEffect(() => {
     if (!selectedRoute || !date) {
@@ -174,7 +179,6 @@ const FactoryWeight = () => {
         </h1>
       </div>
 
-      {/* Entry Form */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <h2
           className={`font-bold text-gray-700 mb-4 border-b pb-2 ${language === "ur" ? "text-right" : ""}`}
@@ -303,32 +307,45 @@ const FactoryWeight = () => {
         )}
       </div>
 
-      {/* History Table (Excel Style Monthly Report) */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div
           className={`p-4 border-b bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4 ${language === "ur" ? "md:flex-row-reverse" : ""}`}
         >
           <h2
-            className={`font-bold text-gray-700 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
+            className={`font-bold text-gray-700 flex items-center gap-2 w-full md:w-auto ${language === "ur" ? "flex-row-reverse" : ""}`}
           >
             <Filter size={18} /> {t("Monthly Factory Report")}
           </h2>
 
           <div
-            className={`flex items-center gap-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
+            className={`flex flex-col md:flex-row items-center gap-3 w-full md:w-auto ${language === "ur" ? "md:flex-row-reverse" : ""}`}
           >
-            <button
-              onClick={exportToExcel}
-              className={`bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${language === "ur" ? "flex-row-reverse" : ""}`}
+            {/* 🔥 NAYA: Route Filter for Monthly Report */}
+            <select
+              value={filterRoute}
+              onChange={(e) => setFilterRoute(e.target.value)}
+              className="border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-teal-500 text-sm w-full md:w-auto bg-white"
             >
-              <Download size={16} /> {t("Excel File")}
-            </button>
+              <option value="">{t("All Routes")}</option>
+              {routes.map((r) => (
+                <option key={r._id} value={r._id}>
+                  {r.routeName}
+                </option>
+              ))}
+            </select>
+
             <input
               type="month"
               value={filterMonth}
               onChange={(e) => setFilterMonth(e.target.value)}
-              className="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-teal-500"
+              className="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-teal-500 w-full md:w-auto"
             />
+            <button
+              onClick={exportToExcel}
+              className={`bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all w-full md:w-auto ${language === "ur" ? "flex-row-reverse" : ""}`}
+            >
+              <Download size={16} /> {t("Excel File")}
+            </button>
           </div>
         </div>
 
@@ -377,7 +394,10 @@ const FactoryWeight = () => {
             <tbody>
               {historyData.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="text-center py-6 text-gray-500">
+                  <td
+                    colSpan={user?.role === "Admin" ? 8 : 7}
+                    className="text-center py-6 text-gray-500"
+                  >
                     {t("No factory records found for this month.")}
                   </td>
                 </tr>
@@ -449,7 +469,6 @@ const FactoryWeight = () => {
         </div>
       </div>
 
-      {/* Edit Modal (Admin Only) */}
       {editModal.show && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">

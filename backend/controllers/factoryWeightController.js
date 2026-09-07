@@ -23,12 +23,10 @@ const getShopTotalWeight = async (req, res) => {
     }).populate("vehicle");
 
     if (collections.length === 0) {
-      return res
-        .status(404)
-        .json({
-          message:
-            "No shop collection found for this route on the selected date.",
-        });
+      return res.status(404).json({
+        message:
+          "No shop collection found for this route on the selected date.",
+      });
     }
 
     const totalShopWeight = collections.reduce(
@@ -61,11 +59,9 @@ const createFactoryWeight = async (req, res) => {
     });
 
     if (existingEntry) {
-      return res
-        .status(400)
-        .json({
-          message: "Factory weight for this Route and Date is already entered!",
-        });
+      return res.status(400).json({
+        message: "Factory weight for this Route and Date is already entered!",
+      });
     }
 
     const difference = factoryWeight - totalShopWeight;
@@ -87,12 +83,10 @@ const createFactoryWeight = async (req, res) => {
     res.status(201).json(newFactoryWeight);
   } catch (error) {
     if (error.code === 11000) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Double Entry Detected: Factory weight already saved for this date/route.",
-        });
+      return res.status(400).json({
+        message:
+          "Double Entry Detected: Factory weight already saved for this date/route.",
+      });
     }
     res.status(500).json({ message: error.message });
   }
@@ -102,8 +96,13 @@ const createFactoryWeight = async (req, res) => {
 // @route   GET /api/factory-weights
 const getFactoryWeights = async (req, res) => {
   try {
-    const { month, date } = req.query;
+    // 🔥 NAYA: routeId add kiya gaya hai
+    const { month, date, routeId } = req.query;
     let matchQuery = {};
+
+    if (routeId) {
+      matchQuery.route = routeId; // Agar route selected hai toh filter lagao
+    }
 
     if (date) {
       const queryDate = new Date(date);
