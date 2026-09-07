@@ -27,7 +27,7 @@ const shopSchema = new mongoose.Schema(
     },
     serialNumber: {
       type: Number,
-      default: 0, // 🔥 NAYA: Serial Number Field
+      default: 0, // 🔥 Serial Number Field
     },
     status: {
       type: String,

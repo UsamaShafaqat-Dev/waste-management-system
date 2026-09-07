@@ -1,6 +1,5 @@
 const Shop = require("../models/Shop");
 
-// @desc    Create a new shop
 const createShop = async (req, res) => {
   try {
     const {
@@ -29,10 +28,9 @@ const createShop = async (req, res) => {
   }
 };
 
-// @desc    Get all shops
 const getShops = async (req, res) => {
   try {
-    // 🔥 NAYA: Shops ko Serial Number ke hisab se sort (tarteeb) kiya gaya hai
+    // 🔥 Shops ko Serial Number ke hisab se sort kiya gaya hai
     const shops = await Shop.find()
       .populate("assignedRoute", "routeName")
       .sort({ serialNumber: 1 });
@@ -42,8 +40,6 @@ const getShops = async (req, res) => {
   }
 };
 
-// @desc    Update a shop
-// @route   PUT /api/shops/:id
 const updateShop = async (req, res) => {
   try {
     const shop = await Shop.findByIdAndUpdate(req.params.id, req.body, {
@@ -60,8 +56,6 @@ const updateShop = async (req, res) => {
   }
 };
 
-// @desc    Delete a shop
-// @route   DELETE /api/shops/:id
 const deleteShop = async (req, res) => {
   try {
     const shop = await Shop.findByIdAndDelete(req.params.id);

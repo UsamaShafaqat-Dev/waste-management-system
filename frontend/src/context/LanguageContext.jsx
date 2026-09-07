@@ -11,7 +11,7 @@ export const LanguageProvider = ({ children }) => {
     localStorage.setItem("appLang", language);
   }, [language]);
 
-  // VIP Dictionary (100% COMPLETE APP)
+  // VIP Dictionary (100% COMPLETE APP WITH NEW TERMS)
   const translations = {
     en: {
       // Menu & General
@@ -118,6 +118,8 @@ export const LanguageProvider = ({ children }) => {
       "Waste Collection": "Waste Collection",
       Payment: "Payment",
       "Note:": "Note:",
+      "Weight (KG)": "Weight (KG)",
+      "Enter Weight (KG)": "Enter Weight (KG)",
 
       // Factory Weight
       "Factory Weight & Reports": "Factory Weight & Reports",
@@ -177,6 +179,11 @@ export const LanguageProvider = ({ children }) => {
       Driver: "Driver",
       "Not Assigned": "Not Assigned",
       "Delete Route?": "Delete Route?",
+      "Serial Number": "Serial Number",
+      "Sr. No": "Sr. No",
+      "All Routes": "All Routes",
+      "Serial updated!": "Serial updated!",
+      "Failed to update serial": "Failed to update serial",
 
       // Vehicles
       "Vehicles Management": "Vehicles Management",
@@ -387,6 +394,8 @@ export const LanguageProvider = ({ children }) => {
       "Waste Collection": "ویسٹ وصولی",
       Payment: "ادائیگی",
       "Note:": "نوٹ:",
+      "Weight (KG)": "وزن (کلوگرام)",
+      "Enter Weight (KG)": "وزن درج کریں (کلوگرام)",
 
       // Factory Weight
       "Factory Weight & Reports": "فیکٹری کا وزن اور رپورٹس",
@@ -445,6 +454,11 @@ export const LanguageProvider = ({ children }) => {
       Driver: "ڈرائیور",
       "Not Assigned": "مختص نہیں ہے",
       "Delete Route?": "کیا روٹ ڈیلیٹ کریں؟",
+      "Serial Number": "سیریل نمبر",
+      "Sr. No": "نمبر شمار",
+      "All Routes": "تمام روٹس",
+      "Serial updated!": "سیریل نمبر اپ ڈیٹ ہو گیا!",
+      "Failed to update serial": "سیریل اپ ڈیٹ کرنے میں مسئلہ",
 
       // Vehicles
       "Vehicles Management": "گاڑیوں کا انتظام",

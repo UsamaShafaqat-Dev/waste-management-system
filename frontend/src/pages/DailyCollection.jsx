@@ -51,7 +51,7 @@ const DailyCollection = () => {
           `/daily-collections/shops/${selectedRoute}`,
         );
 
-        // 🔥 NAYA: Rate aur Mann khatam, Sirf Weight (KG) bacha hai
+        // 🔥 Rate aur Mann khatam, Sirf Weight (KG) bacha hai
         const initialEntries = data.map((shop) => ({
           shopId: shop._id,
           shopName: shop.shopName,
@@ -98,10 +98,10 @@ const DailyCollection = () => {
 
   const handleSubmit = async () => {
     if (!selectedRoute || !date)
-      return toast.error("Please select date and route");
-    if (!vehicleInfo) return toast.error("No vehicle assigned to this route!");
+      return toast.error(t("Please select date and route"));
+    if (!vehicleInfo) return toast.error(t("No Vehicle!"));
     if (shopEntries.length === 0)
-      return toast.error("No shops found in this route");
+      return toast.error(t("No shops found in this route"));
 
     const hasInvalidWeights = shopEntries.some(
       (item) => item.weightKg === "" || parseFloat(item.weightKg) < 0,
@@ -125,7 +125,7 @@ const DailyCollection = () => {
       };
 
       await api.post("/daily-collections", payload);
-      toast.success("Daily Collection Saved Successfully!");
+      toast.success(t("Save Daily Collection"));
 
       setSelectedRoute("");
       setShopEntries([]);
@@ -141,7 +141,6 @@ const DailyCollection = () => {
     <div
       className={`space-y-6 w-full ${language === "ur" ? "text-right" : "text-left"}`}
     >
-      {/* Header */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
         <h1
           className={`text-xl font-bold text-gray-800 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
@@ -154,7 +153,6 @@ const DailyCollection = () => {
         </p>
       </div>
 
-      {/* Selection Filters */}
       <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         <div>
           <label
@@ -169,7 +167,6 @@ const DailyCollection = () => {
             className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500 ${language === "ur" ? "text-right" : ""}`}
           />
         </div>
-
         <div>
           <label
             className={`block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
@@ -189,14 +186,15 @@ const DailyCollection = () => {
             ))}
           </select>
         </div>
-
         <div>
           <label
             className={`block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
           >
             <Truck size={16} /> {t("Assigned Vehicle")}
           </label>
-          <div className="w-full bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-4 py-2.5 overflow-hidden text-ellipsis whitespace-nowrap">
+          <div
+            className={`w-full bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-4 py-2.5 overflow-hidden text-ellipsis whitespace-nowrap ${language === "ur" ? "text-right" : ""}`}
+          >
             {selectedRoute ? (
               vehicleInfo ? (
                 `${vehicleInfo.vehicleNumber} (${vehicleInfo.driverName})`
@@ -210,7 +208,6 @@ const DailyCollection = () => {
         </div>
       </div>
 
-      {/* Collection Data */}
       {selectedRoute && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
           {fetchingShops ? (
@@ -228,7 +225,7 @@ const DailyCollection = () => {
             </div>
           ) : (
             <>
-              {/* DESKTOP VIEW (Table) */}
+              {/* DESKTOP VIEW */}
               <div className="hidden md:block overflow-x-auto">
                 <table
                   className={`w-full border-collapse ${language === "ur" ? "text-right" : "text-left"}`}
@@ -291,7 +288,7 @@ const DailyCollection = () => {
                 </table>
               </div>
 
-              {/* MOBILE VIEW (Cards) */}
+              {/* MOBILE VIEW */}
               <div className="md:hidden p-4 space-y-4">
                 {shopEntries.map((entry, index) => (
                   <div
@@ -299,13 +296,16 @@ const DailyCollection = () => {
                     className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm space-y-3"
                   >
                     <div className="flex justify-between items-center border-b pb-2">
-                      <span className="font-bold text-gray-800 text-xl">
+                      <span
+                        className={`font-bold text-gray-800 text-xl ${language === "ur" ? "text-right w-full" : ""}`}
+                      >
                         {entry.shopName}
                       </span>
                     </div>
-
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-gray-500 uppercase">
+                      <label
+                        className={`text-xs font-semibold text-gray-500 uppercase block ${language === "ur" ? "text-right" : ""}`}
+                      >
                         {t("Enter Weight (KG)")}
                       </label>
                       <input
@@ -324,12 +324,12 @@ const DailyCollection = () => {
                     </div>
                   </div>
                 ))}
-
-                {/* Mobile Totals Card */}
                 <div className="bg-gray-800 text-white rounded-lg p-5 shadow-md mt-6">
-                  <div className="flex justify-between items-center text-sm border-gray-700">
+                  <div
+                    className={`flex justify-between items-center text-sm border-gray-700 ${language === "ur" ? "flex-row-reverse" : ""}`}
+                  >
                     <span className="font-medium text-lg">
-                      {t("Total Weight:")}
+                      {t("Route Total Weight:")}
                     </span>
                     <span className="font-black text-green-400 text-2xl">
                       {totalWeight} KG
@@ -338,17 +338,14 @@ const DailyCollection = () => {
                 </div>
               </div>
 
-              {/* Save Button */}
-              <div className="p-4 md:p-6 bg-gray-50 flex justify-end border-t border-gray-200">
+              <div
+                className={`p-4 md:p-6 bg-gray-50 flex border-t border-gray-200 ${language === "ur" ? "justify-start" : "justify-end"}`}
+              >
                 <button
                   id="save-collection-btn"
                   onClick={handleSubmit}
                   disabled={loading}
-                  className={`flex items-center justify-center gap-2 px-6 md:px-8 py-3.5 rounded-lg text-white font-bold transition-all w-full md:w-auto text-lg ${
-                    loading
-                      ? "bg-green-400 cursor-not-allowed"
-                      : "bg-green-600 hover:bg-green-700 shadow-md"
-                  }`}
+                  className={`flex items-center justify-center gap-2 px-6 md:px-8 py-3.5 rounded-lg text-white font-bold transition-all w-full md:w-auto text-lg ${loading ? "bg-green-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700 shadow-md"} ${language === "ur" ? "flex-row-reverse" : ""}`}
                 >
                   <Save size={24} />
                   {loading

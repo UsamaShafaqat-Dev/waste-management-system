@@ -15,7 +15,7 @@ const Shops = () => {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
-  const [routeFilter, setRouteFilter] = useState(""); // 🔥 NAYA: Route Filter State
+  const [routeFilter, setRouteFilter] = useState("");
 
   const [formData, setFormData] = useState({
     shopName: "",
@@ -47,12 +47,11 @@ const Shops = () => {
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  // 🔥 NAYA: Inline Serial Number Update
   const handleUpdateSerial = async (id, newSerial) => {
     try {
       await api.put(`/shops/${id}`, { serialNumber: Number(newSerial) });
       toast.success(t("Serial updated!"));
-      fetchData(); // Refresh to re-sort
+      fetchData();
     } catch (error) {
       toast.error(t("Failed to update serial"));
     }
@@ -115,7 +114,6 @@ const Shops = () => {
     }
   };
 
-  // 🔥 NAYA: Shops list filtered by Route
   const filteredShopsList = routeFilter
     ? shopsList.filter((s) => s.assignedRoute?._id === routeFilter)
     : shopsList;
@@ -124,7 +122,6 @@ const Shops = () => {
     <div
       className={`space-y-6 relative w-full ${language === "ur" ? "text-right" : "text-left"}`}
     >
-      {/* Header */}
       <div
         className={`flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 gap-4 ${language === "ur" ? "md:flex-row-reverse" : ""}`}
       >
@@ -138,7 +135,6 @@ const Shops = () => {
         <div
           className={`flex items-center gap-3 w-full md:w-auto ${language === "ur" ? "flex-row-reverse" : ""}`}
         >
-          {/* 🔥 NAYA: Route Filter Dropdown */}
           <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg flex-1 md:flex-none">
             <Filter size={16} className="text-gray-500" />
             <select
@@ -172,7 +168,6 @@ const Shops = () => {
         </div>
       </div>
 
-      {/* Add / Edit Form */}
       {showForm && user?.role === "Admin" && (
         <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-100">
           <h2
@@ -282,9 +277,7 @@ const Shops = () => {
         </div>
       )}
 
-      {/* Shops Data Container */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {/* DESKTOP VIEW (Table) */}
         <div className="hidden md:block overflow-x-auto">
           <table
             className={`w-full border-collapse ${language === "ur" ? "text-right" : "text-left"}`}
@@ -332,7 +325,7 @@ const Shops = () => {
                     colSpan={user?.role === "Admin" ? 6 : 5}
                     className="text-center py-8 text-gray-500"
                   >
-                    {t("No shops found.")}
+                    {t("No shops found. Please add a new shop.")}
                   </td>
                 </tr>
               ) : (
@@ -344,7 +337,6 @@ const Shops = () => {
                     <td
                       className={`px-4 py-3 font-bold text-gray-500 ${language === "ur" ? "text-right" : "text-left"}`}
                     >
-                      {/* 🔥 NAYA: Editable Serial Number Input */}
                       <input
                         type="number"
                         defaultValue={shop.serialNumber}
@@ -429,7 +421,6 @@ const Shops = () => {
                   className={`flex justify-between items-center border-b border-gray-100 pb-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
                 >
                   <div className="flex items-center gap-2">
-                    {/* 🔥 NAYA: Mobile Editable Serial Number */}
                     <input
                       type="number"
                       defaultValue={shop.serialNumber}
