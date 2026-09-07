@@ -11,10 +11,8 @@ export const LanguageProvider = ({ children }) => {
     localStorage.setItem("appLang", language);
   }, [language]);
 
-  // VIP Dictionary (100% COMPLETE APP WITH ALL NEW TERMS)
   const translations = {
     en: {
-      // Menu & General
       Dashboard: "Dashboard",
       Vehicles: "Vehicles",
       Routes: "Routes",
@@ -44,8 +42,6 @@ export const LanguageProvider = ({ children }) => {
       Date: "Date",
       Action: "Action",
       Name: "Name",
-
-      // Dashboard
       "Welcome to Waste Management System":
         "Welcome to Waste Management System",
       "Here is what's happening today, ": "Here is what's happening today, ",
@@ -61,8 +57,6 @@ export const LanguageProvider = ({ children }) => {
       "Active Vehicles": "Active Vehicles",
       "Active Routes": "Active Routes",
       "Registered Shops": "Registered Shops",
-
-      // Daily Collection & Shop Ledger
       "Daily Shop Collection / Weight Entry":
         "Daily Shop Collection / Weight Entry",
       "Record daily poultry waste collection from shops":
@@ -124,8 +118,6 @@ export const LanguageProvider = ({ children }) => {
       "Payment / Advance (Debit)": "Payment / Advance (Debit)",
       "Adjustment (Credit)": "Adjustment (Credit)",
       Mann: "Mann",
-
-      // Factory Weight
       "Factory Weight & Reports": "Factory Weight & Reports",
       "Record New Factory Weight": "Record New Factory Weight",
       "No collection found for this date.":
@@ -151,8 +143,6 @@ export const LanguageProvider = ({ children }) => {
       Extra: "Extra",
       Shortage: "Shortage",
       Balanced: "Balanced",
-
-      // Shops & Routes
       "Shops Management": "Shops Management",
       "Add Shop": "Add Shop",
       "Edit Shop": "Edit Shop",
@@ -188,8 +178,6 @@ export const LanguageProvider = ({ children }) => {
       "All Routes": "All Routes",
       "Serial updated!": "Serial updated!",
       "Failed to update serial": "Failed to update serial",
-
-      // Vehicles
       "Vehicles Management": "Vehicles Management",
       "Manage all your transport vehicles":
         "Manage all your transport vehicles",
@@ -207,8 +195,6 @@ export const LanguageProvider = ({ children }) => {
       "Name/Type": "Name/Type",
       Contact: "Contact",
       "Delete Vehicle?": "Delete Vehicle?",
-
-      // Monthly Reports & Route Ledger
       "Monthly Business Report": "Monthly Business Report",
       "Generate, view, and export overall business summaries":
         "Generate, view, and export overall business summaries",
@@ -244,8 +230,6 @@ export const LanguageProvider = ({ children }) => {
       "Route Totals:": "Route Totals:",
       "Total Shop KG": "Total Shop KG",
       "Total Factory KG": "Total Factory KG",
-
-      // Users & Settings
       "User Management": "User Management",
       "Manage Admin and restricted Staff accounts":
         "Manage Admin and restricted Staff accounts",
@@ -293,9 +277,23 @@ export const LanguageProvider = ({ children }) => {
       "Receive alerts for deleted records or large shortages.":
         "Receive alerts for deleted records or large shortages.",
       "Save Preferences": "Save Preferences",
+
+      // 🔥 NAYE ALFAZ (Monthly Rate)
+      "Monthly Rate": "Monthly Rate",
+      "Monthly Rate Calculation": "Monthly Rate Calculation",
+      "Set rates for shops at the end of the month":
+        "Set rates for shops at the end of the month",
+      "Select Month": "Select Month",
+      "Apply to All": "Apply to All",
+      "Rate (Rs.)": "Rate (Rs.)",
+      Apply: "Apply",
+      "Save Rates": "Save Rates",
+      "Rates saved successfully": "Rates saved successfully",
+      "Applied to all shops": "Applied to all shops",
+      "Please fill all rates": "Please fill all rates",
+      Pending: "Pending",
     },
     ur: {
-      // Menu & General
       Dashboard: "ڈیش بورڈ",
       Vehicles: "گاڑیاں",
       Routes: "روٹس",
@@ -325,8 +323,6 @@ export const LanguageProvider = ({ children }) => {
       Date: "تاریخ",
       Action: "ایکشن",
       Name: "نام",
-
-      // Dashboard Text
       "Welcome to Waste Management System": "ویسٹ مینجمنٹ سسٹم میں خوش آمدید",
       "Here is what's happening today, ": "آج کی تازہ ترین صورتحال، ",
       "Filter Overview": "فلٹر کا جائزہ",
@@ -341,8 +337,6 @@ export const LanguageProvider = ({ children }) => {
       "Active Vehicles": "فعال گاڑیاں",
       "Active Routes": "فعال روٹس",
       "Registered Shops": "رجسٹرڈ دکانیں",
-
-      // Daily Collection & Shop Ledger
       "Daily Shop Collection / Weight Entry":
         "روزانہ دکان کی وصولی / وزن کا اندراج",
       "Record daily poultry waste collection from shops":
@@ -404,8 +398,6 @@ export const LanguageProvider = ({ children }) => {
       "Payment / Advance (Debit)": "ادائیگی / ایڈوانس (ڈیبٹ)",
       "Adjustment (Credit)": "ایڈجسٹمنٹ (کریڈٹ)",
       Mann: "من",
-
-      // Factory Weight
       "Factory Weight & Reports": "فیکٹری کا وزن اور رپورٹس",
       "Record New Factory Weight": "نیا فیکٹری وزن درج کریں",
       "No collection found for this date.": "اس تاریخ کی کوئی وصولی نہیں ملی۔",
@@ -430,8 +422,6 @@ export const LanguageProvider = ({ children }) => {
       Extra: "اضافی",
       Shortage: "کمی",
       Balanced: "برابر",
-
-      // Shops & Routes
       "Shops Management": "دکانوں کا انتظام",
       "Add Shop": "دکان شامل کریں",
       "Edit Shop": "دکان میں ترمیم کریں",
@@ -467,8 +457,6 @@ export const LanguageProvider = ({ children }) => {
       "All Routes": "تمام روٹس",
       "Serial updated!": "سیریل نمبر اپ ڈیٹ ہو گیا!",
       "Failed to update serial": "سیریل اپ ڈیٹ کرنے میں مسئلہ",
-
-      // Vehicles
       "Vehicles Management": "گاڑیوں کا انتظام",
       "Manage all your transport vehicles":
         "اپنی تمام ٹرانسپورٹ گاڑیوں کا انتظام کریں",
@@ -486,8 +474,6 @@ export const LanguageProvider = ({ children }) => {
       "Name/Type": "نام / قسم",
       Contact: "رابطہ",
       "Delete Vehicle?": "کیا گاڑی ڈیلیٹ کریں؟",
-
-      // Monthly Reports & Route Ledger
       "Monthly Business Report": "ماہانہ کاروباری رپورٹ",
       "Generate, view, and export overall business summaries":
         "مجموعی کاروباری خلاصہ بنائیں، دیکھیں اور ایکسپورٹ کریں",
@@ -524,8 +510,6 @@ export const LanguageProvider = ({ children }) => {
       "Route Totals:": "روٹ کا کل:",
       "Total Shop KG": "دکان کا کل کلوگرام",
       "Total Factory KG": "فیکٹری کا کل کلوگرام",
-
-      // Users & Settings
       "User Management": "صارفین کا انتظام",
       "Manage Admin and restricted Staff accounts":
         "ایڈمن اور محدود سٹاف اکاؤنٹس کا انتظام کریں",
@@ -573,6 +557,21 @@ export const LanguageProvider = ({ children }) => {
       "Receive alerts for deleted records or large shortages.":
         "ڈیلیٹ کیے گئے ریکارڈز یا بڑی کمی پر الرٹس وصول کریں۔",
       "Save Preferences": "ترجیحات محفوظ کریں",
+
+      // 🔥 NAYE ALFAZ (Monthly Rate)
+      "Monthly Rate": "ماہانہ ریٹ",
+      "Monthly Rate Calculation": "ماہانہ ریٹ کا حساب",
+      "Set rates for shops at the end of the month":
+        "مہینے کے آخر میں دکانوں کا ریٹ سیٹ کریں",
+      "Select Month": "مہینہ منتخب کریں",
+      "Apply to All": "سب پر لاگو کریں",
+      "Rate (Rs.)": "ریٹ (روپے)",
+      Apply: "لاگو کریں",
+      "Save Rates": "ریٹس محفوظ کریں",
+      "Rates saved successfully": "ریٹس کامیابی سے محفوظ ہو گئے",
+      "Applied to all shops": "سب دکانوں پر لاگو ہو گیا",
+      "Please fill all rates": "براہ کرم تمام ریٹس درج کریں",
+      Pending: "باقی ہے",
     },
   };
 

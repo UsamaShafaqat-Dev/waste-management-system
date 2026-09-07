@@ -10,7 +10,7 @@ import { Toaster } from "react-hot-toast";
 // 1. COMPONENTS & CONTEXT IMPORT SECTION
 // ==========================================
 import { AuthProvider } from "./context/AuthContext";
-import { LanguageProvider } from "./context/LanguageContext"; // 🌐 Naya Language Context Import Kiya Hai
+import { LanguageProvider } from "./context/LanguageContext";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
@@ -24,13 +24,13 @@ import FactoryWeight from "./pages/FactoryWeight";
 import ShopLedger from "./pages/ShopLedger";
 import RouteLedger from "./pages/RouteLedger";
 import MonthlyReports from "./pages/MonthlyReports";
+import MonthlyRate from "./pages/MonthlyRate"; // 🔥 NAYA IMPORT
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 
 function App() {
   return (
     <Router>
-      {/* AuthProvider ke andar LanguageProvider ko wrap kar diya */}
       <AuthProvider>
         <LanguageProvider>
           <Toaster
@@ -47,16 +47,10 @@ function App() {
           />
 
           <Routes>
-            {/* Public Route */}
             <Route path="/login" element={<Login />} />
 
-            {/* Protected Routes (Bina login ke no access) */}
             <Route element={<ProtectedRoute />}>
-              {/* Layout Wrapper (Sidebar aur Header ke liye) */}
               <Route element={<Layout />}>
-                {/* ========================================== */}
-                {/* 2. APP ROUTES SECTION                      */}
-                {/* ========================================== */}
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/vehicles" element={<Vehicles />} />
                 <Route path="/routes" element={<RoutesPage />} />
@@ -67,13 +61,14 @@ function App() {
                 <Route path="/route-ledger" element={<RouteLedger />} />
                 <Route path="/monthly-reports" element={<MonthlyReports />} />
 
-                {/* Admin Only Pages (UI level par hum inko hide karenge but route mojood rahega) */}
+                {/* 🔥 NAYA ROUTE */}
+                <Route path="/monthly-rate" element={<MonthlyRate />} />
+
                 <Route path="/users" element={<Users />} />
                 <Route path="/settings" element={<Settings />} />
               </Route>
             </Route>
 
-            {/* Redirect unknown routes to Dashboard */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </LanguageProvider>

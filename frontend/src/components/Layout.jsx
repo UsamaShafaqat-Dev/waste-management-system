@@ -2,7 +2,7 @@ import { useState, useContext } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { AuthContext } from "../context/AuthContext";
-import { LanguageContext } from "../context/LanguageContext"; // Naya Context Import Kiya
+import { LanguageContext } from "../context/LanguageContext";
 import {
   Menu,
   X,
@@ -21,6 +21,7 @@ import {
   LogOut,
   Leaf,
   Globe,
+  Calculator, // 🔥 NAYA ICON
 } from "lucide-react";
 
 const Layout = () => {
@@ -29,7 +30,6 @@ const Layout = () => {
   const navigate = useNavigate();
 
   const { user, logout } = useContext(AuthContext);
-  // Language Context se language aur translation function (t) nikal liya
   const { language, setLanguage, t } = useContext(LanguageContext);
 
   const allMenuItems = [
@@ -81,6 +81,12 @@ const Layout = () => {
       name: "Monthly Reports",
       icon: <FileText size={20} />,
       adminOnly: true,
+    },
+    {
+      path: "/monthly-rate",
+      name: "Monthly Rate",
+      icon: <Calculator size={20} />,
+      adminOnly: true, // 🔥 NAYI TAB
     },
     {
       path: "/users",
@@ -145,7 +151,6 @@ const Layout = () => {
                   }`}
                 >
                   {item.icon}
-                  {/* Yahan 't' function use kiya hai translation ke liye */}
                   <span className="text-sm font-medium">{t(item.name)}</span>
                 </Link>
               </li>
@@ -188,7 +193,6 @@ const Layout = () => {
           </div>
 
           <div className="flex items-center gap-3 md:gap-4">
-            {/* 🌐 LANGUAGE DROPDOWN BUTTON 🌐 */}
             <div className="flex items-center bg-gray-100 rounded-lg px-2 py-1">
               <Globe size={16} className="text-gray-500 mr-2" />
               <select

@@ -16,21 +16,20 @@ const app = express();
 // MIDDLEWARES
 // ==========================================
 
-
-// Apne backend ke server.js ya app.js mein yeh replace karein:
-app.use(cors({
-  origin: [
-    "http://localhost:5173", // Local testing ke liye
-    "https://waste-management-system-jx3i.vercel.app" // Aap ka Asli Vercel Link
-  ],
-  credentials: true, // Yeh lazmi hai withCredentials wale frontend ke liye
-}));
-app.use(express.json()); // Allow JSON data
-app.use(cookieParser()); // Fixed: Removed the spaces
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://waste-management-system-jx3i.vercel.app",
+    ],
+    credentials: true,
+  }),
+);
+app.use(express.json());
+app.use(cookieParser());
 
 // ==========================================
 // 1. ROUTES IMPORT SECTION
-// (Yahan saare naye routes ki files import karni hain)
 // ==========================================
 const vehicleRoutes = require("./routes/vehicleRoutes");
 const routeRoutes = require("./routes/routeRoutes");
@@ -43,10 +42,10 @@ const reportRoutes = require("./routes/reportRoutes");
 const userRoutes = require("./routes/userRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const authRoutes = require("./routes/authRoutes");
+const monthlyRateRoutes = require("./routes/monthlyRateRoutes"); // 🔥 NAYA IMPORT
 
 // ==========================================
 // 2. ROUTES USAGE SECTION
-// (Yahan saare imported routes ko api path assign karna hai)
 // ==========================================
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/routes", routeRoutes);
@@ -59,14 +58,12 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/monthly-rates", monthlyRateRoutes); // 🔥 NAYA ROUTE LINK
 
 // Dummy API Status Route
 app.get("/api/status", (req, res) =>
   res.send("VIP Server is running securely..."),
 );
-
-
-// ------------------------------
 
 // ==========================================
 // SERVER START
