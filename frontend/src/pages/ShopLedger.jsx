@@ -25,14 +25,13 @@ const ShopLedger = () => {
   const [selectedRoute, setSelectedRoute] = useState("");
   const [selectedShop, setSelectedShop] = useState("");
 
-  // 🔥 NAYA: Search Dropdown States
   const [shopSearchText, setShopSearchText] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
   const [ledgerData, setLedgerData] = useState(null);
   const [ledgerHistory, setLedgerHistory] = useState([]);
-  const [localSummary, setLocalSummary] = useState(null); // Frontend calculation ke liye
+  const [localSummary, setLocalSummary] = useState(null);
 
   const [loading, setLoading] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -46,7 +45,6 @@ const ShopLedger = () => {
     notes: "",
   });
 
-  // Load Routes
   useEffect(() => {
     const fetchRoutes = async () => {
       try {
@@ -59,7 +57,16 @@ const ShopLedger = () => {
     fetchRoutes();
   }, []);
 
-  // Filter Shops by Route
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   useEffect(() => {
     setSelectedShop("");
     setShopSearchText("");
@@ -81,18 +88,6 @@ const ShopLedger = () => {
     fetchShops();
   }, [selectedRoute]);
 
-  // Handle Outside Click for Shop Dropdown
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Fetch Ledger and Calculate Running Balance
   const fetchLedger = async () => {
     if (!selectedShop) return;
     setLoading(true);
@@ -104,7 +99,6 @@ const ShopLedger = () => {
       let totalPayable = 0;
       let totalPaid = 0;
 
-      // Collections Processing (Adds to Payable Balance)
       let history = (data.collections || []).map((c) => {
         totalKg += c.weightKg;
         totalPayable += c.amount;
@@ -116,13 +110,12 @@ const ShopLedger = () => {
         };
       });
 
-      // Payments Processing (Debit = Paid/Advance, Credit = Adjustment)
       const payments = (data.payments || []).map((p) => {
-        const isCredit = p.paymentType === "Credit"; // Credit = Owe them more
+        const isCredit = p.paymentType === "Credit";
         if (isCredit) {
           totalPayable += p.amount;
         } else {
-          totalPaid += p.amount; // Debit = We paid them / Advance
+          totalPaid += p.amount;
         }
         return {
           ...p,
@@ -136,7 +129,6 @@ const ShopLedger = () => {
         (a, b) => new Date(a.date) - new Date(b.date),
       );
 
-      // Final Running Balance Logic (Proper Minus calculation)
       let runningBalance = 0;
       history = history.map((item) => {
         runningBalance += item.credit - item.debit;
@@ -214,7 +206,6 @@ const ShopLedger = () => {
     <div
       className={`space-y-6 ${language === "ur" ? "text-right" : "text-left"}`}
     >
-      {/* Header */}
       <div
         className={`print:hidden flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 ${language === "ur" ? "flex-row-reverse" : ""}`}
       >
@@ -255,7 +246,6 @@ const ShopLedger = () => {
         )}
       </div>
 
-      {/* Selectors with Searchable Dropdown */}
       <div
         className={`print:hidden bg-white p-6 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-6 ${language === "ur" ? "text-right" : "text-left"}`}
       >
@@ -303,7 +293,6 @@ const ShopLedger = () => {
             />
           </div>
 
-          {/* Custom Search Dropdown List */}
           {isDropdownOpen && selectedRoute && (
             <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
               {shops
@@ -348,7 +337,6 @@ const ShopLedger = () => {
         </div>
       </div>
 
-      {/* Payment Form */}
       <div className="print:hidden">
         {showPaymentForm && selectedShop && (
           <div className="bg-indigo-50 p-6 rounded-xl shadow-sm border border-indigo-100">
@@ -464,7 +452,6 @@ const ShopLedger = () => {
         )}
       </div>
 
-      {/* Ledger Summary Cards & Table */}
       {localSummary && (
         <div className="space-y-6">
           <div
@@ -512,6 +499,12 @@ const ShopLedger = () => {
               >
                 <thead>
                   <tr className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
+                    {/* 🔥 NAYA: Sr. No Column Header */}
+                    <th
+                      className={`px-6 py-3 w-16 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                    >
+                      {t("Sr. No")}
+                    </th>
                     <th
                       className={`px-6 py-3 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
                     >
@@ -553,7 +546,7 @@ const ShopLedger = () => {
                   {ledgerHistory.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={user?.role === "Admin" ? 7 : 6}
+                        colSpan={user?.role === "Admin" ? 8 : 7}
                         className="text-center py-8 text-gray-400"
                       >
                         {t("No transactions found.")}
@@ -565,6 +558,10 @@ const ShopLedger = () => {
                         key={index}
                         className="border-b hover:bg-gray-50 text-sm"
                       >
+                        {/* 🔥 NAYA: Sr. No Column Data */}
+                        <td className="px-6 py-3 font-medium text-gray-500">
+                          {index + 1}
+                        </td>
                         <td className="px-6 py-3">
                           {new Date(row.date).toLocaleDateString(
                             language === "ur" ? "ur-PK" : "en-US",
@@ -597,7 +594,8 @@ const ShopLedger = () => {
                                     className="print:hidden"
                                   />
                                 )}
-                                {t("Payment")} ({t(row.paymentMethod)})
+                                {/* 🔥 NAYA: Fixed Payment Formatting */}
+                                {t("Payment")} - {t(row.paymentMethod)}
                               </span>
                               {row.notes && (
                                 <div className="text-xs text-gray-500 mt-1 font-medium">
