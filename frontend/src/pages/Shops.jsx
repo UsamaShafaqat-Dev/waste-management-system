@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useContext } from "react";
-import { Store, Plus, Trash2, Edit, AlertTriangle } from "lucide-react";
+import { Store, Plus, Trash2, Edit, AlertTriangle, Filter } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
-import { LanguageContext } from "../context/LanguageContext"; // Language Context
+import { LanguageContext } from "../context/LanguageContext";
 
 const Shops = () => {
   const { user } = useContext(AuthContext);
-  const { t, language } = useContext(LanguageContext); // Translation Hook
+  const { t, language } = useContext(LanguageContext);
 
   const [shopsList, setShopsList] = useState([]);
   const [routesList, setRoutesList] = useState([]);
@@ -15,6 +15,7 @@ const Shops = () => {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
+  const [routeFilter, setRouteFilter] = useState(""); // 🔥 NAYA: Route Filter State
 
   const [formData, setFormData] = useState({
     shopName: "",
@@ -22,7 +23,7 @@ const Shops = () => {
     contact: "",
     address: "",
     assignedRoute: "",
-    ratePerKg: "",
+    serialNumber: 0,
     status: "Active",
   });
 
@@ -46,16 +47,27 @@ const Shops = () => {
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
+  // 🔥 NAYA: Inline Serial Number Update
+  const handleUpdateSerial = async (id, newSerial) => {
+    try {
+      await api.put(`/shops/${id}`, { serialNumber: Number(newSerial) });
+      toast.success(t("Serial updated!"));
+      fetchData(); // Refresh to re-sort
+    } catch (error) {
+      toast.error(t("Failed to update serial"));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       if (editId) {
         await api.put(`/shops/${editId}`, formData);
-        toast.success("Shop updated!");
+        toast.success(t("Shop updated!"));
       } else {
         await api.post("/shops", formData);
-        toast.success("Shop added!");
+        toast.success(t("Shop added!"));
       }
       setFormData({
         shopName: "",
@@ -63,14 +75,14 @@ const Shops = () => {
         contact: "",
         address: "",
         assignedRoute: "",
-        ratePerKg: "",
+        serialNumber: 0,
         status: "Active",
       });
       setEditId(null);
       setShowForm(false);
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Error saving");
+      toast.error(error.response?.data?.message || t("Error saving"));
     } finally {
       setLoading(false);
     }
@@ -84,7 +96,7 @@ const Shops = () => {
       contact: shop.contact || "",
       address: shop.address || "",
       assignedRoute: shop.assignedRoute ? shop.assignedRoute._id : "",
-      ratePerKg: shop.ratePerKg,
+      serialNumber: shop.serialNumber || 0,
       status: shop.status,
     });
     setShowForm(true);
@@ -94,14 +106,19 @@ const Shops = () => {
   const executeDelete = async () => {
     try {
       await api.delete(`/shops/${deleteModal.id}`);
-      toast.success("Deleted successfully!");
+      toast.success(t("Deleted successfully!"));
       fetchData();
     } catch (error) {
-      toast.error("Error deleting");
+      toast.error(t("Error deleting"));
     } finally {
       setDeleteModal({ show: false, id: null });
     }
   };
+
+  // 🔥 NAYA: Shops list filtered by Route
+  const filteredShopsList = routeFilter
+    ? shopsList.filter((s) => s.assignedRoute?._id === routeFilter)
+    : shopsList;
 
   return (
     <div
@@ -118,20 +135,41 @@ const Shops = () => {
             <Store className="text-cyan-600" /> {t("Shops Management")}
           </h1>
         </div>
-        {user?.role === "Admin" && (
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className={`w-full md:w-auto bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-2 hover:bg-green-700 transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
-          >
-            {showForm ? (
-              t("Cancel")
-            ) : (
-              <>
-                <Plus size={18} /> {t("Add Shop")}
-              </>
-            )}
-          </button>
-        )}
+        <div
+          className={`flex items-center gap-3 w-full md:w-auto ${language === "ur" ? "flex-row-reverse" : ""}`}
+        >
+          {/* 🔥 NAYA: Route Filter Dropdown */}
+          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg flex-1 md:flex-none">
+            <Filter size={16} className="text-gray-500" />
+            <select
+              value={routeFilter}
+              onChange={(e) => setRouteFilter(e.target.value)}
+              className={`bg-transparent outline-none text-sm text-gray-700 w-full ${language === "ur" ? "text-right" : ""}`}
+            >
+              <option value="">{t("All Routes")}</option>
+              {routesList.map((r) => (
+                <option key={r._id} value={r._id}>
+                  {r.routeName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {user?.role === "Admin" && (
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className={`bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-2 hover:bg-green-700 transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
+            >
+              {showForm ? (
+                t("Cancel")
+              ) : (
+                <>
+                  <Plus size={18} /> {t("Add Shop")}
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Add / Edit Form */}
@@ -146,6 +184,18 @@ const Shops = () => {
             onSubmit={handleSubmit}
             className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${language === "ur" ? "text-right" : "text-left"}`}
           >
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">
+                {t("Serial Number")}
+              </label>
+              <input
+                type="number"
+                name="serialNumber"
+                value={formData.serialNumber}
+                onChange={handleChange}
+                className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
+              />
+            </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">
                 {t("Shop Name *")}
@@ -181,7 +231,6 @@ const Shops = () => {
                 name="contact"
                 value={formData.contact}
                 onChange={handleChange}
-                placeholder="e.g. 0300-1234567"
                 className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
               />
             </div>
@@ -203,21 +252,6 @@ const Shops = () => {
                   </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">
-                {t("Rate per KG (Rs.) *")}
-              </label>
-              <input
-                type="number"
-                name="ratePerKg"
-                min="0"
-                step="any"
-                value={formData.ratePerKg}
-                onChange={handleChange}
-                required
-                className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
-              />
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">
@@ -258,9 +292,9 @@ const Shops = () => {
             <thead>
               <tr className="bg-gray-800 text-white text-sm">
                 <th
-                  className={`px-4 py-4 w-12 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                  className={`px-4 py-4 w-20 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
                 >
-                  #
+                  {t("Sr. No")}
                 </th>
                 <th
                   className={`px-4 py-4 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
@@ -278,11 +312,6 @@ const Shops = () => {
                   {t("Assigned Route")}
                 </th>
                 <th
-                  className={`px-4 py-4 font-medium ${language === "ur" ? "text-left" : "text-right"}`}
-                >
-                  {t("Rate/KG")}
-                </th>
-                <th
                   className={`px-4 py-4 font-medium ${language === "ur" ? "text-left" : "text-left"}`}
                 >
                   {t("Status")}
@@ -297,17 +326,17 @@ const Shops = () => {
               </tr>
             </thead>
             <tbody>
-              {shopsList.length === 0 ? (
+              {filteredShopsList.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={user?.role === "Admin" ? 7 : 6}
+                    colSpan={user?.role === "Admin" ? 6 : 5}
                     className="text-center py-8 text-gray-500"
                   >
-                    {t("No shops found. Please add a new shop.")}
+                    {t("No shops found.")}
                   </td>
                 </tr>
               ) : (
-                shopsList.map((shop, index) => (
+                filteredShopsList.map((shop) => (
                   <tr
                     key={shop._id}
                     className="border-b hover:bg-gray-50 text-sm transition-colors"
@@ -315,7 +344,16 @@ const Shops = () => {
                     <td
                       className={`px-4 py-3 font-bold text-gray-500 ${language === "ur" ? "text-right" : "text-left"}`}
                     >
-                      {index + 1}
+                      {/* 🔥 NAYA: Editable Serial Number Input */}
+                      <input
+                        type="number"
+                        defaultValue={shop.serialNumber}
+                        onBlur={(e) =>
+                          handleUpdateSerial(shop._id, e.target.value)
+                        }
+                        className="w-14 border border-gray-300 rounded px-2 py-1 text-center outline-none focus:border-green-500"
+                        title="Click to edit and click outside to save"
+                      />
                     </td>
                     <td
                       className={`px-4 py-3 font-bold text-gray-800 ${language === "ur" ? "text-right" : "text-left"}`}
@@ -336,11 +374,6 @@ const Shops = () => {
                       {shop.assignedRoute
                         ? shop.assignedRoute.routeName
                         : "Not Assigned"}
-                    </td>
-                    <td
-                      className={`px-4 py-3 font-semibold text-gray-800 ${language === "ur" ? "text-left" : "text-right"}`}
-                    >
-                      Rs. {shop.ratePerKg}
                     </td>
                     <td
                       className={`px-4 py-3 ${language === "ur" ? "text-left" : "text-left"}`}
@@ -382,23 +415,29 @@ const Shops = () => {
 
         {/* MOBILE VIEW (Cards) */}
         <div className="md:hidden flex flex-col p-4 gap-4 bg-gray-50">
-          {shopsList.length === 0 ? (
+          {filteredShopsList.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              {t("No shops found. Please add a new shop.")}
+              {t("No shops found.")}
             </div>
           ) : (
-            shopsList.map((shop, index) => (
+            filteredShopsList.map((shop) => (
               <div
                 key={shop._id}
                 className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col gap-3"
               >
                 <div
-                  className={`flex justify-between items-start border-b border-gray-100 pb-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
+                  className={`flex justify-between items-center border-b border-gray-100 pb-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
                 >
-                  <div>
-                    <span className="text-xs font-bold text-gray-400">
-                      #{index + 1}
-                    </span>
+                  <div className="flex items-center gap-2">
+                    {/* 🔥 NAYA: Mobile Editable Serial Number */}
+                    <input
+                      type="number"
+                      defaultValue={shop.serialNumber}
+                      onBlur={(e) =>
+                        handleUpdateSerial(shop._id, e.target.value)
+                      }
+                      className="w-12 border border-gray-300 rounded px-1 py-1 text-center outline-none text-xs font-bold"
+                    />
                     <h3
                       className={`font-bold text-lg text-gray-800 ${language === "ur" ? "text-right" : "text-left"}`}
                     >
@@ -411,7 +450,6 @@ const Shops = () => {
                     {t(shop.status)}
                   </span>
                 </div>
-
                 <div
                   className={`grid grid-cols-2 gap-2 text-sm ${language === "ur" ? "text-right" : "text-left"}`}
                 >
@@ -440,18 +478,7 @@ const Shops = () => {
                         : "None"}
                     </span>
                   </div>
-                  <div
-                    className={`flex flex-col mt-2 ${language === "ur" ? "items-end" : "items-start"}`}
-                  >
-                    <span className="text-gray-500 text-xs">
-                      {t("Rate/KG")}
-                    </span>
-                    <span className="font-bold text-gray-800">
-                      Rs. {shop.ratePerKg}
-                    </span>
-                  </div>
                 </div>
-
                 {user?.role === "Admin" && (
                   <div
                     className={`flex justify-end gap-2 pt-3 border-t border-gray-100 mt-1 ${language === "ur" ? "flex-row-reverse" : ""}`}

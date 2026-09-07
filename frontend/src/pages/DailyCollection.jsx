@@ -9,10 +9,10 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
-import { LanguageContext } from "../context/LanguageContext"; // Zaban badalne ke liye import kiya
+import { LanguageContext } from "../context/LanguageContext";
 
 const DailyCollection = () => {
-  const { t, language } = useContext(LanguageContext); // Translation function nikal liya
+  const { t, language } = useContext(LanguageContext);
 
   const [routes, setRoutes] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -51,14 +51,11 @@ const DailyCollection = () => {
           `/daily-collections/shops/${selectedRoute}`,
         );
 
+        // 🔥 NAYA: Rate aur Mann khatam, Sirf Weight (KG) bacha hai
         const initialEntries = data.map((shop) => ({
           shopId: shop._id,
           shopName: shop.shopName,
-          ratePerKg: shop.ratePerKg,
-          inputWeight: "",
-          unit: "KG",
-          weightKg: 0,
-          amount: 0,
+          weightKg: "",
         }));
 
         setShopEntries(initialEntries);
@@ -72,23 +69,9 @@ const DailyCollection = () => {
     fetchShopsForRoute();
   }, [selectedRoute, routes]);
 
-  const handleWeightChange = (index, value, field) => {
+  const handleWeightChange = (index, value) => {
     const updatedEntries = [...shopEntries];
-
-    if (field === "weight") {
-      updatedEntries[index].inputWeight = value;
-    } else if (field === "unit") {
-      updatedEntries[index].unit = value;
-    }
-
-    const val = parseFloat(updatedEntries[index].inputWeight) || 0;
-    const isMann = updatedEntries[index].unit === "Mann";
-
-    const computedKg = isMann ? val * 40 : val;
-
-    updatedEntries[index].weightKg = computedKg;
-    updatedEntries[index].amount = computedKg * updatedEntries[index].ratePerKg;
-
+    updatedEntries[index].weightKg = value;
     setShopEntries(updatedEntries);
   };
 
@@ -109,10 +92,9 @@ const DailyCollection = () => {
   };
 
   const totalWeight = shopEntries.reduce(
-    (sum, item) => sum + (item.weightKg || 0),
+    (sum, item) => sum + (parseFloat(item.weightKg) || 0),
     0,
   );
-  const totalAmount = shopEntries.reduce((sum, item) => sum + item.amount, 0);
 
   const handleSubmit = async () => {
     if (!selectedRoute || !date)
@@ -122,7 +104,7 @@ const DailyCollection = () => {
       return toast.error("No shops found in this route");
 
     const hasInvalidWeights = shopEntries.some(
-      (item) => item.inputWeight === "" || parseFloat(item.inputWeight) < 0,
+      (item) => item.weightKg === "" || parseFloat(item.weightKg) < 0,
     );
     if (hasInvalidWeights) {
       return toast.error(
@@ -136,7 +118,10 @@ const DailyCollection = () => {
         date,
         routeId: selectedRoute,
         vehicleId: vehicleInfo._id,
-        collections: shopEntries,
+        collections: shopEntries.map((entry) => ({
+          shopId: entry.shopId,
+          weightKg: parseFloat(entry.weightKg),
+        })),
       };
 
       await api.post("/daily-collections", payload);
@@ -251,24 +236,14 @@ const DailyCollection = () => {
                   <thead>
                     <tr className="bg-gray-800 text-white text-sm">
                       <th
-                        className={`px-6 py-4 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                        className={`px-6 py-4 font-medium w-1/2 ${language === "ur" ? "text-right" : "text-left"}`}
                       >
                         {t("Shop Name")}
                       </th>
                       <th
-                        className={`px-6 py-4 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                        className={`px-6 py-4 font-medium w-1/2 ${language === "ur" ? "text-right" : "text-left"}`}
                       >
-                        {t("Rate / KG")}
-                      </th>
-                      <th
-                        className={`px-6 py-4 font-medium w-64 ${language === "ur" ? "text-right" : "text-left"}`}
-                      >
-                        {t("Weight Input")}
-                      </th>
-                      <th
-                        className={`px-6 py-4 font-medium ${language === "ur" ? "text-left" : "text-right"}`}
-                      >
-                        {t("Total Amount (Rs)")}
+                        {t("Weight (KG)")}
                       </th>
                     </tr>
                   </thead>
@@ -278,58 +253,23 @@ const DailyCollection = () => {
                         key={entry.shopId}
                         className="border-b hover:bg-gray-50 transition-colors"
                       >
-                        <td className="px-6 py-4 font-medium text-gray-800">
+                        <td className="px-6 py-4 font-bold text-gray-800 text-lg">
                           {entry.shopName}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
-                          Rs. {entry.ratePerKg}
-                        </td>
                         <td className="px-6 py-4">
-                          <div
-                            className={`flex items-center border border-gray-300 rounded overflow-hidden focus-within:ring-1 focus-within:ring-green-500 focus-within:border-green-500 ${language === "ur" ? "flex-row-reverse" : ""}`}
-                          >
-                            <input
-                              id={`weight-input-${index}`}
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={entry.inputWeight}
-                              onChange={(e) =>
-                                handleWeightChange(
-                                  index,
-                                  e.target.value,
-                                  "weight",
-                                )
-                              }
-                              onKeyDown={(e) => handleKeyDown(e, index)}
-                              className={`w-full px-3 py-2 outline-none ${language === "ur" ? "text-right" : "text-left"}`}
-                              placeholder="0"
-                            />
-                            <select
-                              value={entry.unit}
-                              onChange={(e) =>
-                                handleWeightChange(
-                                  index,
-                                  e.target.value,
-                                  "unit",
-                                )
-                              }
-                              className={`bg-gray-100 ${language === "ur" ? "border-r" : "border-l"} border-gray-300 px-2 py-2 outline-none font-medium text-gray-600 cursor-pointer`}
-                            >
-                              <option value="KG">KG</option>
-                              <option value="Mann">Mann</option>
-                            </select>
-                          </div>
-                          {entry.unit === "Mann" && entry.inputWeight && (
-                            <div className="text-xs text-green-600 mt-1 font-medium">
-                              {t("Calculated:")} {entry.weightKg} KG
-                            </div>
-                          )}
-                        </td>
-                        <td
-                          className={`px-6 py-4 font-bold text-gray-800 ${language === "ur" ? "text-left" : "text-right"}`}
-                        >
-                          Rs. {entry.amount.toLocaleString()}
+                          <input
+                            id={`weight-input-${index}`}
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={entry.weightKg}
+                            onChange={(e) =>
+                              handleWeightChange(index, e.target.value)
+                            }
+                            onKeyDown={(e) => handleKeyDown(e, index)}
+                            className={`w-full border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500 px-4 py-3 outline-none text-xl font-medium text-blue-700 bg-blue-50 ${language === "ur" ? "text-right" : "text-left"}`}
+                            placeholder="0"
+                          />
                         </td>
                       </tr>
                     ))}
@@ -337,20 +277,14 @@ const DailyCollection = () => {
                   <tfoot>
                     <tr className="bg-green-50 border-t-2 border-green-200">
                       <td
-                        colSpan="2"
-                        className={`px-6 py-4 font-bold text-green-800 text-lg ${language === "ur" ? "text-left" : "text-right"}`}
+                        className={`px-6 py-4 font-bold text-green-800 text-xl ${language === "ur" ? "text-left" : "text-right"}`}
                       >
-                        {t("Route Total:")}
+                        {t("Route Total Weight:")}
                       </td>
                       <td
-                        className={`px-6 py-4 font-bold text-green-800 text-lg ${language === "ur" ? "text-right" : "text-left"}`}
+                        className={`px-6 py-4 font-black text-green-800 text-2xl ${language === "ur" ? "text-right" : "text-left"}`}
                       >
                         {totalWeight} KG
-                      </td>
-                      <td
-                        className={`px-6 py-4 font-bold text-green-800 text-lg ${language === "ur" ? "text-left" : "text-right"}`}
-                      >
-                        Rs. {totalAmount.toLocaleString()}
                       </td>
                     </tr>
                   </tfoot>
@@ -365,75 +299,40 @@ const DailyCollection = () => {
                     className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm space-y-3"
                   >
                     <div className="flex justify-between items-center border-b pb-2">
-                      <span className="font-bold text-gray-800 text-lg">
+                      <span className="font-bold text-gray-800 text-xl">
                         {entry.shopName}
-                      </span>
-                      <span className="text-sm text-gray-600 bg-white px-2 py-1 rounded shadow-sm border">
-                        {t("Rate:")} Rs. {entry.ratePerKg}
                       </span>
                     </div>
 
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-gray-500 uppercase">
-                        {t("Enter Weight")}
+                        {t("Enter Weight (KG)")}
                       </label>
-                      <div
-                        className={`flex items-center border border-gray-300 rounded overflow-hidden focus-within:ring-1 focus-within:ring-green-500 focus-within:border-green-500 bg-white ${language === "ur" ? "flex-row-reverse" : ""}`}
-                      >
-                        <input
-                          id={`weight-input-mobile-${index}`}
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={entry.inputWeight}
-                          onChange={(e) =>
-                            handleWeightChange(index, e.target.value, "weight")
-                          }
-                          onKeyDown={(e) => handleKeyDown(e, index)}
-                          className={`w-full px-3 py-2.5 outline-none text-lg ${language === "ur" ? "text-right" : "text-left"}`}
-                          placeholder="0"
-                        />
-                        <select
-                          value={entry.unit}
-                          onChange={(e) =>
-                            handleWeightChange(index, e.target.value, "unit")
-                          }
-                          className={`bg-gray-100 ${language === "ur" ? "border-r" : "border-l"} border-gray-300 px-3 py-2.5 outline-none font-bold text-gray-700 cursor-pointer h-full`}
-                        >
-                          <option value="KG">KG</option>
-                          <option value="Mann">Mann</option>
-                        </select>
-                      </div>
-                      {entry.unit === "Mann" && entry.inputWeight && (
-                        <div className="text-xs text-green-600 font-medium text-right">
-                          {t("Calculated:")} {entry.weightKg} KG
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex justify-between items-center pt-2 bg-green-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg border-t border-green-100">
-                      <span className="font-semibold text-green-800">
-                        {t("Total Amount:")}
-                      </span>
-                      <span className="font-bold text-green-800 text-lg">
-                        Rs. {entry.amount.toLocaleString()}
-                      </span>
+                      <input
+                        id={`weight-input-mobile-${index}`}
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={entry.weightKg}
+                        onChange={(e) =>
+                          handleWeightChange(index, e.target.value)
+                        }
+                        onKeyDown={(e) => handleKeyDown(e, index)}
+                        className={`w-full border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500 px-4 py-3 outline-none text-2xl font-bold text-blue-700 bg-blue-50 ${language === "ur" ? "text-right" : "text-left"}`}
+                        placeholder="0"
+                      />
                     </div>
                   </div>
                 ))}
 
                 {/* Mobile Totals Card */}
-                <div className="bg-gray-800 text-white rounded-lg p-4 shadow-md mt-6 space-y-2">
-                  <div className="flex justify-between items-center text-sm text-gray-300 border-b border-gray-700 pb-2">
-                    <span>{t("Route Total Weight:")}</span>
-                    <span className="font-bold text-white text-base">
-                      {totalWeight} KG
+                <div className="bg-gray-800 text-white rounded-lg p-5 shadow-md mt-6">
+                  <div className="flex justify-between items-center text-sm border-gray-700">
+                    <span className="font-medium text-lg">
+                      {t("Total Weight:")}
                     </span>
-                  </div>
-                  <div className="flex justify-between items-center pt-1">
-                    <span className="font-medium">{t("Total Payable:")}</span>
-                    <span className="font-bold text-green-400 text-xl">
-                      Rs. {totalAmount.toLocaleString()}
+                    <span className="font-black text-green-400 text-2xl">
+                      {totalWeight} KG
                     </span>
                   </div>
                 </div>
@@ -445,13 +344,13 @@ const DailyCollection = () => {
                   id="save-collection-btn"
                   onClick={handleSubmit}
                   disabled={loading}
-                  className={`flex items-center justify-center gap-2 px-6 md:px-8 py-3 rounded-lg text-white font-medium transition-all w-full md:w-auto ${
+                  className={`flex items-center justify-center gap-2 px-6 md:px-8 py-3.5 rounded-lg text-white font-bold transition-all w-full md:w-auto text-lg ${
                     loading
                       ? "bg-green-400 cursor-not-allowed"
-                      : "bg-green-600 hover:bg-green-700 shadow-md hover:shadow-lg"
+                      : "bg-green-600 hover:bg-green-700 shadow-md"
                   }`}
                 >
-                  <Save size={20} />
+                  <Save size={24} />
                   {loading
                     ? t("Saving Collection...")
                     : t("Save Daily Collection")}

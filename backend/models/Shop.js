@@ -14,7 +14,6 @@ const shopSchema = new mongoose.Schema(
     },
     contact: {
       type: String,
-      required: [true, "Contact number is required"],
       trim: true,
     },
     address: {
@@ -26,9 +25,9 @@ const shopSchema = new mongoose.Schema(
       ref: "Route",
       required: [true, "A shop must be assigned to a route"],
     },
-    ratePerKg: {
+    serialNumber: {
       type: Number,
-      required: [true, "Payment rate per KG is required"],
+      default: 0, // 🔥 NAYA: Serial Number Field
     },
     status: {
       type: String,

@@ -9,7 +9,7 @@ const createShop = async (req, res) => {
       contact,
       address,
       assignedRoute,
-      ratePerKg,
+      serialNumber,
       status,
     } = req.body;
 
@@ -19,7 +19,7 @@ const createShop = async (req, res) => {
       contact,
       address,
       assignedRoute,
-      ratePerKg,
+      serialNumber: serialNumber || 0,
       status,
     });
 
@@ -32,7 +32,10 @@ const createShop = async (req, res) => {
 // @desc    Get all shops
 const getShops = async (req, res) => {
   try {
-    const shops = await Shop.find().populate("assignedRoute", "routeName");
+    // 🔥 NAYA: Shops ko Serial Number ke hisab se sort (tarteeb) kiya gaya hai
+    const shops = await Shop.find()
+      .populate("assignedRoute", "routeName")
+      .sort({ serialNumber: 1 });
     res.status(200).json(shops);
   } catch (error) {
     res.status(500).json({ message: error.message });
