@@ -12,7 +12,7 @@ import api from "../services/api";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-import { LanguageContext } from "../context/LanguageContext"; // Translation Hook
+import { LanguageContext } from "../context/LanguageContext";
 
 const MonthlyReports = () => {
   const { t, language } = useContext(LanguageContext);
@@ -75,48 +75,99 @@ const MonthlyReports = () => {
     toast.success("PDF Exported Successfully!");
   };
 
-  const exportExcel = () => {
+  // 🔥 NAYA VIP EXCEL LOGIC (1 to 31 Dates Grid)
+  const exportExcel = async () => {
     if (!reportData) return;
-    const monthName = new Date(0, month - 1).toLocaleString("default", {
-      month: "long",
-    });
+    toast.loading("Generating VIP Excel Report...");
 
-    const excelData = [
-      {
-        [t("Metric")]: t("Total Routes"),
-        [t("Value")]: reportData.masterData.totalRoutes,
-      },
-      {
-        [t("Metric")]: t("Total Vehicles"),
-        [t("Value")]: reportData.masterData.totalVehicles,
-      },
-      {
-        [t("Metric")]: t("Total Shops"),
-        [t("Value")]: reportData.masterData.totalShops,
-      },
-      {
-        [t("Metric")]: t("Total Shop Weight (KG)"),
-        [t("Value")]: reportData.report.totalShopKg,
-      },
-      {
-        [t("Metric")]: t("Total Factory Weight (KG)"),
-        [t("Value")]: reportData.report.totalFactoryKg,
-      },
-      {
-        [t("Metric")]: t("Total Difference (KG)"),
-        [t("Value")]: reportData.report.totalDifference,
-      },
-      {
-        [t("Metric")]: t("Total Payable Amount (Rs.)"),
-        [t("Value")]: reportData.report.totalPayableAmount,
-      },
-    ];
+    try {
+      // Get all route IDs to fetch detailed data
+      const { data: allRoutes } = await api.get("/routes");
 
-    const worksheet = XLSX.utils.json_to_sheet(excelData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Monthly Report");
-    XLSX.writeFile(workbook, `Monthly_Report_${monthName}_${year}.xlsx`);
-    toast.success("Excel Exported Successfully!");
+      const monthStr = `${year}-${String(month).padStart(2, "0")}`;
+      const daysInMonth = new Date(year, month, 0).getDate();
+
+      let allExcelRows = [];
+
+      for (const route of allRoutes) {
+        if (route.status !== "Active") continue;
+
+        // Fetch Shops for this route
+        const { data: shops } = await api.get(
+          `/daily-collections/shops/${route._id}`,
+        );
+        // Fetch Monthly Rates
+        const { data: rates } = await api.get(
+          `/monthly-rates?month=${monthStr}&routeId=${route._id}`,
+        );
+
+        // Build rows for each shop in this route
+        for (let i = 0; i < shops.length; i++) {
+          const shop = shops[i];
+          const shopRateObj = rates.find((r) => r.shopId === shop._id);
+          const shopRate = shopRateObj ? shopRateObj.rate : 0;
+
+          // Fetch collections for this specific shop and month
+          // (In a real massive app, we'd fetch this in bulk, but for now this works perfectly)
+          const { data: ledgerData } = await api.get(
+            `/ledger/shop/${shop._id}`,
+          );
+          const collections = ledgerData.collections.filter((c) =>
+            c.date.startsWith(monthStr),
+          );
+
+          // Prepare Row Data
+          let row = {
+            "Sr. No": shop.serialNumber || i + 1,
+            "Shop Name": shop.shopName,
+            Route: route.routeName,
+          };
+
+          let totalKg = 0;
+
+          // Add 1 to 31 columns
+          for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${monthStr}-${String(day).padStart(2, "0")}`;
+            const collectionForDay = collections.find((c) =>
+              c.date.startsWith(dateStr),
+            );
+            const kgForDay = collectionForDay ? collectionForDay.weightKg : 0;
+
+            row[`${day}`] = kgForDay > 0 ? kgForDay : "";
+            totalKg += kgForDay;
+          }
+
+          // Append summary columns
+          row["Total Weight (KG)"] = totalKg;
+          row["Total Weight (Mann)"] = (totalKg / 40).toFixed(2);
+          row["Rate/KG (Rs)"] = shopRate;
+          row["Total Bill (Rs)"] = totalKg * shopRate;
+
+          allExcelRows.push(row);
+        }
+      }
+
+      toast.dismiss(); // Clear loading
+
+      if (allExcelRows.length === 0) {
+        return toast.error("No data found to generate Excel");
+      }
+
+      // Generate Excel File
+      const worksheet = XLSX.utils.json_to_sheet(allExcelRows);
+      const workbook = XLSX.utils.book_new();
+
+      const monthName = new Date(0, month - 1).toLocaleString("default", {
+        month: "long",
+      });
+      XLSX.utils.book_append_sheet(workbook, worksheet, `${monthName} Report`);
+
+      XLSX.writeFile(workbook, `Detailed_Report_${monthName}_${year}.xlsx`);
+      toast.success("VIP Excel Exported Successfully!");
+    } catch (error) {
+      toast.dismiss();
+      toast.error("Error generating detailed Excel report");
+    }
   };
 
   const handlePrint = () => {
@@ -161,9 +212,7 @@ const MonthlyReports = () => {
               <option key={m} value={m}>
                 {new Date(0, m - 1).toLocaleString(
                   language === "ur" ? "ur-PK" : "en-US",
-                  {
-                    month: "short",
-                  },
+                  { month: "short" },
                 )}
               </option>
             ))}
@@ -211,9 +260,7 @@ const MonthlyReports = () => {
                 {t("For ")}
                 {new Date(0, month - 1).toLocaleString(
                   language === "ur" ? "ur-PK" : "en-US",
-                  {
-                    month: "long",
-                  },
+                  { month: "long" },
                 )}{" "}
                 {year}
               </p>

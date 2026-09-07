@@ -1,6 +1,7 @@
 const Payment = require("../models/Payment");
 const DailyCollection = require("../models/DailyCollection");
 const Shop = require("../models/Shop");
+const MonthlyRate = require("../models/MonthlyRate"); // 🔥 NAYA IMPORT
 
 // @desc    Add a new payment to a shop
 // @route   POST /api/ledger/payments
@@ -49,6 +50,7 @@ const editPayment = async (req, res) => {
 const getShopLedger = async (req, res) => {
   try {
     const shopId = req.params.shopId;
+    const currentMonthStr = new Date().toISOString().slice(0, 7); // Format: YYYY-MM
 
     const shop = await Shop.findById(shopId).populate(
       "assignedRoute",
@@ -61,19 +63,25 @@ const getShopLedger = async (req, res) => {
     });
     const payments = await Payment.find({ shop: shopId }).sort({ date: 1 });
 
+    // 🔥 NAYA: Monthly Rate nikalna
+    const monthlyRate = await MonthlyRate.findOne({
+      shop: shopId,
+      month: currentMonthStr,
+    });
+    const currentRate = monthlyRate ? monthlyRate.rate : 0; // Agar rate nahi laga toh 0
+
     const totalCollectedKg = collections.reduce(
       (sum, item) => sum + item.weightKg,
       0,
     );
 
-    // Total Payable (Credit): Waste Amount + Any Credit Payments
-    const wastePayable = collections.reduce(
-      (sum, item) => sum + item.amount,
-      0,
-    );
+    // 🔥 NAYA: Total Payable (Weight * Monthly Rate)
+    const wastePayable = totalCollectedKg * currentRate;
+
     const creditPayments = payments
       .filter((p) => p.paymentType === "Credit")
       .reduce((sum, item) => sum + item.amount, 0);
+
     const totalPayableAmount = wastePayable + creditPayments;
 
     // Total Paid (Debit)
@@ -83,6 +91,13 @@ const getShopLedger = async (req, res) => {
 
     const remainingBalance = totalPayableAmount - totalPaidAmount;
 
+    // Har collection ke sath rate aur amount attach karna
+    const updatedCollections = collections.map((c) => ({
+      ...c._doc,
+      ratePerKg: currentRate,
+      amount: c.weightKg * currentRate,
+    }));
+
     res.status(200).json({
       shopDetails: shop,
       summary: {
@@ -91,7 +106,7 @@ const getShopLedger = async (req, res) => {
         totalPaidAmount,
         remainingBalance,
       },
-      collections,
+      collections: updatedCollections,
       payments,
     });
   } catch (error) {
