@@ -21,18 +21,85 @@ const MonthlyReports = () => {
   const [month, setMonth] = useState(currentDate.getMonth() + 1);
   const [year, setYear] = useState(currentDate.getFullYear());
   const [reportData, setReportData] = useState(null);
+  const [detailedData, setDetailedData] = useState([]); // 🔥 NAYA: Detail table ke liye
   const [loading, setLoading] = useState(false);
+
+  const daysInMonth = new Date(year, month, 0).getDate();
 
   const fetchReport = async () => {
     setLoading(true);
+    toast.loading(t("Generating Detailed Report..."), { id: "reportToast" });
     try {
-      const { data } = await api.get(
+      // 1. Fetch Summary Data
+      const { data: summary } = await api.get(
         `/reports/monthly?month=${month}&year=${year}`,
       );
-      setReportData(data);
+      setReportData(summary);
+
+      // 2. Fetch Detailed Data for 1-31 Grid
+      const monthStr = `${year}-${String(month).padStart(2, "0")}`;
+      const { data: allRoutes } = await api.get("/routes");
+      let allExcelRows = [];
+
+      for (const route of allRoutes) {
+        if (route.status !== "Active") continue;
+
+        const { data: shops } = await api.get(
+          `/daily-collections/shops/${route._id}`,
+        );
+        const { data: rates } = await api.get(
+          `/monthly-rates?month=${monthStr}&routeId=${route._id}`,
+        );
+
+        for (let i = 0; i < shops.length; i++) {
+          const shop = shops[i];
+          const shopRateObj = rates.find((r) => r.shopId === shop._id);
+          const shopRate = shopRateObj ? shopRateObj.rate : 0;
+
+          const { data: ledgerData } = await api.get(
+            `/ledger/shop/${shop._id}`,
+          );
+          const collections = ledgerData.collections.filter((c) =>
+            c.date.startsWith(monthStr),
+          );
+
+          let rowData = {
+            srNo: shop.serialNumber || i + 1,
+            shopName: shop.shopName,
+            ownerName: shop.ownerName,
+            route: route.routeName,
+            days: {},
+            totalKg: 0,
+            rate: shopRate,
+          };
+
+          for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${monthStr}-${String(day).padStart(2, "0")}`;
+            const collectionForDay = collections.find((c) =>
+              c.date.startsWith(dateStr),
+            );
+            const kgForDay = collectionForDay ? collectionForDay.weightKg : 0;
+
+            rowData.days[day] = kgForDay;
+            rowData.totalKg += kgForDay;
+          }
+
+          rowData.totalMann = (rowData.totalKg / 40).toFixed(2);
+          rowData.totalBill = rowData.totalKg * rowData.rate;
+
+          allExcelRows.push(rowData);
+        }
+      }
+
+      // Sort by Serial Number
+      allExcelRows.sort((a, b) => a.srNo - b.srNo);
+      setDetailedData(allExcelRows);
+
+      toast.success(t("Report Generated Successfully!"), { id: "reportToast" });
     } catch (error) {
-      toast.error("Failed to fetch report data");
+      toast.error(t("Failed to generate report"), { id: "reportToast" });
       setReportData(null);
+      setDetailedData([]);
     } finally {
       setLoading(false);
     }
@@ -75,99 +142,49 @@ const MonthlyReports = () => {
     toast.success("PDF Exported Successfully!");
   };
 
-  // 🔥 NAYA VIP EXCEL LOGIC (1 to 31 Dates Grid)
-  const exportExcel = async () => {
-    if (!reportData) return;
-    toast.loading("Generating VIP Excel Report...");
+  // 🔥 NAYA VIP EXCEL EXPORT (100% Correct Formatting)
+  const exportExcel = () => {
+    if (detailedData.length === 0) return toast.error("No data available");
 
-    try {
-      // Get all route IDs to fetch detailed data
-      const { data: allRoutes } = await api.get("/routes");
+    // 1. Array of Arrays Banayen Taake Headings Tarteeb Mein Rahein
+    const headers = [t("Sr. No"), t("Shop Name"), t("Owner"), t("Route")];
 
-      const monthStr = `${year}-${String(month).padStart(2, "0")}`;
-      const daysInMonth = new Date(year, month, 0).getDate();
-
-      let allExcelRows = [];
-
-      for (const route of allRoutes) {
-        if (route.status !== "Active") continue;
-
-        // Fetch Shops for this route
-        const { data: shops } = await api.get(
-          `/daily-collections/shops/${route._id}`,
-        );
-        // Fetch Monthly Rates
-        const { data: rates } = await api.get(
-          `/monthly-rates?month=${monthStr}&routeId=${route._id}`,
-        );
-
-        // Build rows for each shop in this route
-        for (let i = 0; i < shops.length; i++) {
-          const shop = shops[i];
-          const shopRateObj = rates.find((r) => r.shopId === shop._id);
-          const shopRate = shopRateObj ? shopRateObj.rate : 0;
-
-          // Fetch collections for this specific shop and month
-          // (In a real massive app, we'd fetch this in bulk, but for now this works perfectly)
-          const { data: ledgerData } = await api.get(
-            `/ledger/shop/${shop._id}`,
-          );
-          const collections = ledgerData.collections.filter((c) =>
-            c.date.startsWith(monthStr),
-          );
-
-          // Prepare Row Data
-          let row = {
-            "Sr. No": shop.serialNumber || i + 1,
-            "Shop Name": shop.shopName,
-            Route: route.routeName,
-          };
-
-          let totalKg = 0;
-
-          // Add 1 to 31 columns
-          for (let day = 1; day <= daysInMonth; day++) {
-            const dateStr = `${monthStr}-${String(day).padStart(2, "0")}`;
-            const collectionForDay = collections.find((c) =>
-              c.date.startsWith(dateStr),
-            );
-            const kgForDay = collectionForDay ? collectionForDay.weightKg : 0;
-
-            row[`${day}`] = kgForDay > 0 ? kgForDay : "";
-            totalKg += kgForDay;
-          }
-
-          // Append summary columns
-          row["Total Weight (KG)"] = totalKg;
-          row["Total Weight (Mann)"] = (totalKg / 40).toFixed(2);
-          row["Rate/KG (Rs)"] = shopRate;
-          row["Total Bill (Rs)"] = totalKg * shopRate;
-
-          allExcelRows.push(row);
-        }
-      }
-
-      toast.dismiss(); // Clear loading
-
-      if (allExcelRows.length === 0) {
-        return toast.error("No data found to generate Excel");
-      }
-
-      // Generate Excel File
-      const worksheet = XLSX.utils.json_to_sheet(allExcelRows);
-      const workbook = XLSX.utils.book_new();
-
-      const monthName = new Date(0, month - 1).toLocaleString("default", {
-        month: "long",
-      });
-      XLSX.utils.book_append_sheet(workbook, worksheet, `${monthName} Report`);
-
-      XLSX.writeFile(workbook, `Detailed_Report_${monthName}_${year}.xlsx`);
-      toast.success("VIP Excel Exported Successfully!");
-    } catch (error) {
-      toast.dismiss();
-      toast.error("Error generating detailed Excel report");
+    // 1 se 31 tak dates add karein
+    for (let i = 1; i <= daysInMonth; i++) {
+      headers.push(i.toString());
     }
+
+    // Last column headings
+    headers.push(t("Total KG"), t("Mann"), t("Rate"), t("Total Bill (Rs)"));
+
+    const excelRows = [headers];
+
+    // 2. Data add karein usi tarteeb mein
+    detailedData.forEach((row) => {
+      const rowData = [row.srNo, row.shopName, row.ownerName, row.route];
+
+      for (let i = 1; i <= daysInMonth; i++) {
+        rowData.push(row.days[i] > 0 ? row.days[i] : ""); // 0 ki jagah khali chhor dein safai ke liye
+      }
+
+      rowData.push(row.totalKg, row.totalMann, row.rate, row.totalBill);
+      excelRows.push(rowData);
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(excelRows);
+
+    // Thori si column width set karein (Optional styling for neatness)
+    const wscols = [{ wch: 6 }, { wch: 20 }, { wch: 15 }, { wch: 15 }];
+    worksheet["!cols"] = wscols;
+
+    const workbook = XLSX.utils.book_new();
+    const monthName = new Date(0, month - 1).toLocaleString("default", {
+      month: "long",
+    });
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Monthly Report");
+    XLSX.writeFile(workbook, `Detailed_Report_${monthName}_${year}.xlsx`);
+    toast.success("Excel Exported Successfully!");
   };
 
   const handlePrint = () => {
@@ -212,7 +229,9 @@ const MonthlyReports = () => {
               <option key={m} value={m}>
                 {new Date(0, m - 1).toLocaleString(
                   language === "ur" ? "ur-PK" : "en-US",
-                  { month: "short" },
+                  {
+                    month: "short",
+                  },
                 )}
               </option>
             ))}
@@ -244,139 +263,239 @@ const MonthlyReports = () => {
       </div>
 
       {reportData && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 print:m-0 print:border-none print:shadow-none">
-          <div
-            className={`flex justify-between items-center mb-6 border-b pb-4 ${language === "ur" ? "flex-row-reverse" : ""}`}
-          >
-            <div>
-              <h2
-                className={`text-2xl font-bold text-gray-800 ${language === "ur" ? "text-right" : "text-left"}`}
-              >
-                {t("Monthly Business Report")}
-              </h2>
-              <p
-                className={`text-gray-500 mt-1 ${language === "ur" ? "text-right" : "text-left"}`}
-              >
-                {t("For ")}
-                {new Date(0, month - 1).toLocaleString(
-                  language === "ur" ? "ur-PK" : "en-US",
-                  { month: "long" },
-                )}{" "}
-                {year}
-              </p>
-            </div>
+        <div className="space-y-6">
+          {/* Summary Cards Section */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 print:m-0 print:border-none print:shadow-none">
             <div
-              className={`flex gap-2 print:hidden ${language === "ur" ? "flex-row-reverse" : ""}`}
+              className={`flex justify-between items-center mb-6 border-b pb-4 ${language === "ur" ? "flex-row-reverse" : ""}`}
             >
-              <button
-                onClick={handlePrint}
-                className={`flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
+              <div>
+                <h2
+                  className={`text-2xl font-bold text-gray-800 ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  {t("Monthly Business Report")}
+                </h2>
+                <p
+                  className={`text-gray-500 mt-1 ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  {t("For ")}
+                  {new Date(0, month - 1).toLocaleString(
+                    language === "ur" ? "ur-PK" : "en-US",
+                    {
+                      month: "long",
+                    },
+                  )}{" "}
+                  {year}
+                </p>
+              </div>
+              <div
+                className={`flex gap-2 print:hidden ${language === "ur" ? "flex-row-reverse" : ""}`}
               >
-                <Printer size={16} /> {t("Print")}
-              </button>
-              <button
-                onClick={exportPDF}
-                className={`flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-sm font-medium transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
-              >
-                <Download size={16} /> {t("PDF")}
-              </button>
-              <button
-                onClick={exportExcel}
-                className={`flex items-center gap-2 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-sm font-medium transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
-              >
-                <FileSpreadsheet size={16} /> {t("Excel")}
-              </button>
+                <button
+                  onClick={handlePrint}
+                  className={`flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
+                >
+                  <Printer size={16} /> {t("Print")}
+                </button>
+                <button
+                  onClick={exportPDF}
+                  className={`flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-sm font-medium transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
+                >
+                  <Download size={16} /> {t("PDF")}
+                </button>
+                <button
+                  onClick={exportExcel}
+                  className={`flex items-center gap-2 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-sm font-medium transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
+                >
+                  <FileSpreadsheet size={16} /> {t("Excel")}
+                </button>
+              </div>
+            </div>
+
+            <div
+              className={`grid grid-cols-1 md:grid-cols-2 gap-8 ${language === "ur" ? "text-right" : "text-left"}`}
+            >
+              <div>
+                <h3 className="text-lg font-semibold text-gray-700 mb-4">
+                  {t("Infrastructure Overview")}
+                </h3>
+                <ul className="space-y-4">
+                  <li
+                    className={`flex justify-between items-center p-3 bg-gray-50 rounded-lg ${language === "ur" ? "flex-row-reverse" : ""}`}
+                  >
+                    <span className="text-gray-600">{t("Total Routes")}</span>
+                    <span className="font-bold text-gray-900">
+                      {reportData.masterData.totalRoutes}
+                    </span>
+                  </li>
+                  <li
+                    className={`flex justify-between items-center p-3 bg-gray-50 rounded-lg ${language === "ur" ? "flex-row-reverse" : ""}`}
+                  >
+                    <span className="text-gray-600">{t("Total Vehicles")}</span>
+                    <span className="font-bold text-gray-900">
+                      {reportData.masterData.totalVehicles}
+                    </span>
+                  </li>
+                  <li
+                    className={`flex justify-between items-center p-3 bg-gray-50 rounded-lg ${language === "ur" ? "flex-row-reverse" : ""}`}
+                  >
+                    <span className="text-gray-600">{t("Total Shops")}</span>
+                    <span className="font-bold text-gray-900">
+                      {reportData.masterData.totalShops}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-700 mb-4">
+                  {t("Collection & Financials")}
+                </h3>
+                <ul className="space-y-4">
+                  <li
+                    className={`flex justify-between items-center p-3 bg-blue-50 rounded-lg ${language === "ur" ? "flex-row-reverse" : ""}`}
+                  >
+                    <span className="text-blue-800 font-medium">
+                      {t("Total Shop Weight")}
+                    </span>
+                    <span className="font-bold text-blue-900">
+                      {reportData.report.totalShopKg} KG
+                    </span>
+                  </li>
+                  <li
+                    className={`flex justify-between items-center p-3 bg-teal-50 rounded-lg ${language === "ur" ? "flex-row-reverse" : ""}`}
+                  >
+                    <span className="text-teal-800 font-medium">
+                      {t("Total Factory Weight")}
+                    </span>
+                    <span className="font-bold text-teal-900">
+                      {reportData.report.totalFactoryKg} KG
+                    </span>
+                  </li>
+                  <li
+                    className={`flex justify-between items-center p-3 rounded-lg ${reportData.report.totalDifference >= 0 ? "bg-green-50" : "bg-red-50"} ${language === "ur" ? "flex-row-reverse" : ""}`}
+                  >
+                    <span
+                      className={`font-medium ${reportData.report.totalDifference >= 0 ? "text-green-800" : "text-red-800"}`}
+                    >
+                      {t("Total Difference")}
+                    </span>
+                    <span
+                      className={`font-bold ${reportData.report.totalDifference >= 0 ? "text-green-900" : "text-red-900"}`}
+                    >
+                      {reportData.report.totalDifference > 0 ? "+" : ""}
+                      {reportData.report.totalDifference} KG
+                    </span>
+                  </li>
+                  <li
+                    className={`flex justify-between items-center p-3 bg-purple-50 rounded-lg border border-purple-100 ${language === "ur" ? "flex-row-reverse" : ""}`}
+                  >
+                    <span className="text-purple-800 font-bold">
+                      {t("Total Payable Amount")}
+                    </span>
+                    <span className="font-bold text-purple-900 text-lg">
+                      Rs.{" "}
+                      {reportData.report.totalPayableAmount.toLocaleString()}
+                    </span>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
 
-          <div
-            className={`grid grid-cols-1 md:grid-cols-2 gap-8 ${language === "ur" ? "text-right" : "text-left"}`}
-          >
-            <div>
-              <h3 className="text-lg font-semibold text-gray-700 mb-4">
-                {t("Infrastructure Overview")}
-              </h3>
-              <ul className="space-y-4">
-                <li
-                  className={`flex justify-between items-center p-3 bg-gray-50 rounded-lg ${language === "ur" ? "flex-row-reverse" : ""}`}
+          {/* 🔥 NAYA: Detailed Grid UI (1-31 Dates) */}
+          {detailedData.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:mt-4">
+              <div className="p-4 border-b bg-gray-50">
+                <h3
+                  className={`font-bold text-gray-800 ${language === "ur" ? "text-right" : "text-left"}`}
                 >
-                  <span className="text-gray-600">{t("Total Routes")}</span>
-                  <span className="font-bold text-gray-900">
-                    {reportData.masterData.totalRoutes}
-                  </span>
-                </li>
-                <li
-                  className={`flex justify-between items-center p-3 bg-gray-50 rounded-lg ${language === "ur" ? "flex-row-reverse" : ""}`}
+                  {t("Detailed Shop Report")}
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table
+                  className={`w-full border-collapse text-sm ${language === "ur" ? "text-right" : "text-left"}`}
                 >
-                  <span className="text-gray-600">{t("Total Vehicles")}</span>
-                  <span className="font-bold text-gray-900">
-                    {reportData.masterData.totalVehicles}
-                  </span>
-                </li>
-                <li
-                  className={`flex justify-between items-center p-3 bg-gray-50 rounded-lg ${language === "ur" ? "flex-row-reverse" : ""}`}
-                >
-                  <span className="text-gray-600">{t("Total Shops")}</span>
-                  <span className="font-bold text-gray-900">
-                    {reportData.masterData.totalShops}
-                  </span>
-                </li>
-              </ul>
-            </div>
+                  <thead>
+                    <tr className="bg-gray-800 text-white">
+                      <th className="px-3 py-3 border-r border-gray-600">
+                        {t("Sr. No")}
+                      </th>
+                      <th className="px-4 py-3 border-r border-gray-600 whitespace-nowrap">
+                        {t("Shop Name")}
+                      </th>
+                      <th className="px-4 py-3 border-r border-gray-600">
+                        {t("Route")}
+                      </th>
 
-            <div>
-              <h3 className="text-lg font-semibold text-gray-700 mb-4">
-                {t("Collection & Financials")}
-              </h3>
-              <ul className="space-y-4">
-                <li
-                  className={`flex justify-between items-center p-3 bg-blue-50 rounded-lg ${language === "ur" ? "flex-row-reverse" : ""}`}
-                >
-                  <span className="text-blue-800 font-medium">
-                    {t("Total Shop Weight")}
-                  </span>
-                  <span className="font-bold text-blue-900">
-                    {reportData.report.totalShopKg} KG
-                  </span>
-                </li>
-                <li
-                  className={`flex justify-between items-center p-3 bg-teal-50 rounded-lg ${language === "ur" ? "flex-row-reverse" : ""}`}
-                >
-                  <span className="text-teal-800 font-medium">
-                    {t("Total Factory Weight")}
-                  </span>
-                  <span className="font-bold text-teal-900">
-                    {reportData.report.totalFactoryKg} KG
-                  </span>
-                </li>
-                <li
-                  className={`flex justify-between items-center p-3 rounded-lg ${reportData.report.totalDifference >= 0 ? "bg-green-50" : "bg-red-50"} ${language === "ur" ? "flex-row-reverse" : ""}`}
-                >
-                  <span
-                    className={`font-medium ${reportData.report.totalDifference >= 0 ? "text-green-800" : "text-red-800"}`}
-                  >
-                    {t("Total Difference")}
-                  </span>
-                  <span
-                    className={`font-bold ${reportData.report.totalDifference >= 0 ? "text-green-900" : "text-red-900"}`}
-                  >
-                    {reportData.report.totalDifference > 0 ? "+" : ""}
-                    {reportData.report.totalDifference} KG
-                  </span>
-                </li>
-                <li
-                  className={`flex justify-between items-center p-3 bg-purple-50 rounded-lg border border-purple-100 ${language === "ur" ? "flex-row-reverse" : ""}`}
-                >
-                  <span className="text-purple-800 font-bold">
-                    {t("Total Payable Amount")}
-                  </span>
-                  <span className="font-bold text-purple-900 text-lg">
-                    Rs. {reportData.report.totalPayableAmount.toLocaleString()}
-                  </span>
-                </li>
-              </ul>
+                      {/* 1-31 Dates Headers */}
+                      {Array.from({ length: daysInMonth }).map((_, i) => (
+                        <th
+                          key={i}
+                          className="px-2 py-3 border-r border-gray-600 text-center font-semibold text-xs"
+                        >
+                          {i + 1}
+                        </th>
+                      ))}
+
+                      <th className="px-4 py-3 border-r border-gray-600">
+                        {t("Total KG")}
+                      </th>
+                      <th className="px-4 py-3 border-r border-gray-600">
+                        {t("Mann")}
+                      </th>
+                      <th className="px-4 py-3 border-r border-gray-600">
+                        {t("Rate")}
+                      </th>
+                      <th className="px-4 py-3">{t("Total Bill (Rs)")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detailedData.map((row, index) => (
+                      <tr
+                        key={index}
+                        className="border-b hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-3 py-2 border-r text-center font-medium text-gray-500">
+                          {row.srNo}
+                        </td>
+                        <td className="px-4 py-2 border-r font-bold text-gray-800 whitespace-nowrap">
+                          {row.shopName}
+                        </td>
+                        <td className="px-4 py-2 border-r text-gray-600 whitespace-nowrap">
+                          {row.route}
+                        </td>
+
+                        {/* 1-31 Dates Data */}
+                        {Array.from({ length: daysInMonth }).map((_, i) => (
+                          <td
+                            key={i}
+                            className="px-2 py-2 border-r text-center text-gray-500 font-medium"
+                          >
+                            {row.days[i + 1] > 0 ? row.days[i + 1] : "-"}
+                          </td>
+                        ))}
+
+                        <td className="px-4 py-2 border-r text-center font-bold text-blue-600">
+                          {row.totalKg}
+                        </td>
+                        <td className="px-4 py-2 border-r text-center text-gray-500">
+                          {row.totalMann}
+                        </td>
+                        <td className="px-4 py-2 border-r text-center text-purple-600 font-bold">
+                          {row.rate}
+                        </td>
+                        <td className="px-4 py-2 text-center font-bold text-green-600">
+                          {row.totalBill.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>
