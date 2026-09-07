@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   BookOpen,
   Map,
@@ -9,23 +9,30 @@ import {
   ArrowUpRight,
   Printer,
   Edit,
+  Search,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
-import { LanguageContext } from "../context/LanguageContext"; // Language Context
+import { LanguageContext } from "../context/LanguageContext";
 
 const ShopLedger = () => {
   const { user } = useContext(AuthContext);
-  const { t, language } = useContext(LanguageContext); // Translation hook
+  const { t, language } = useContext(LanguageContext);
 
   const [routes, setRoutes] = useState([]);
   const [shops, setShops] = useState([]);
   const [selectedRoute, setSelectedRoute] = useState("");
   const [selectedShop, setSelectedShop] = useState("");
 
+  // 🔥 NAYA: Search Dropdown States
+  const [shopSearchText, setShopSearchText] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
   const [ledgerData, setLedgerData] = useState(null);
   const [ledgerHistory, setLedgerHistory] = useState([]);
+  const [localSummary, setLocalSummary] = useState(null); // Frontend calculation ke liye
 
   const [loading, setLoading] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -39,6 +46,7 @@ const ShopLedger = () => {
     notes: "",
   });
 
+  // Load Routes
   useEffect(() => {
     const fetchRoutes = async () => {
       try {
@@ -51,8 +59,10 @@ const ShopLedger = () => {
     fetchRoutes();
   }, []);
 
+  // Filter Shops by Route
   useEffect(() => {
     setSelectedShop("");
+    setShopSearchText("");
     setLedgerData(null);
     if (!selectedRoute) {
       setShops([]);
@@ -71,6 +81,18 @@ const ShopLedger = () => {
     fetchShops();
   }, [selectedRoute]);
 
+  // Handle Outside Click for Shop Dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Fetch Ledger and Calculate Running Balance
   const fetchLedger = async () => {
     if (!selectedShop) return;
     setLoading(true);
@@ -78,35 +100,43 @@ const ShopLedger = () => {
       const { data } = await api.get(`/ledger/shop/${selectedShop}`);
       setLedgerData(data);
 
-      let history = [];
-      if (data.collections) {
-        history = [
-          ...history,
-          ...data.collections.map((c) => ({
-            ...c,
-            type: "Collection",
-            credit: c.amount,
-            debit: 0,
-          })),
-        ];
-      }
-      if (data.payments) {
-        history = [
-          ...history,
-          ...data.payments.map((p) => {
-            const isCredit = p.paymentType === "Credit";
-            return {
-              ...p,
-              type: "Payment",
-              credit: isCredit ? p.amount : 0,
-              debit: !isCredit ? p.amount : 0,
-            };
-          }),
-        ];
-      }
+      let totalKg = 0;
+      let totalPayable = 0;
+      let totalPaid = 0;
 
-      history.sort((a, b) => new Date(a.date) - new Date(b.date));
+      // Collections Processing (Adds to Payable Balance)
+      let history = (data.collections || []).map((c) => {
+        totalKg += c.weightKg;
+        totalPayable += c.amount;
+        return {
+          ...c,
+          type: "Collection",
+          credit: c.amount,
+          debit: 0,
+        };
+      });
 
+      // Payments Processing (Debit = Paid/Advance, Credit = Adjustment)
+      const payments = (data.payments || []).map((p) => {
+        const isCredit = p.paymentType === "Credit"; // Credit = Owe them more
+        if (isCredit) {
+          totalPayable += p.amount;
+        } else {
+          totalPaid += p.amount; // Debit = We paid them / Advance
+        }
+        return {
+          ...p,
+          type: "Payment",
+          credit: isCredit ? p.amount : 0,
+          debit: !isCredit ? p.amount : 0,
+        };
+      });
+
+      history = [...history, ...payments].sort(
+        (a, b) => new Date(a.date) - new Date(b.date),
+      );
+
+      // Final Running Balance Logic (Proper Minus calculation)
       let runningBalance = 0;
       history = history.map((item) => {
         runningBalance += item.credit - item.debit;
@@ -114,6 +144,12 @@ const ShopLedger = () => {
       });
 
       setLedgerHistory(history);
+      setLocalSummary({
+        totalCollectedKg: totalKg,
+        totalPayableAmount: totalPayable,
+        totalPaidAmount: totalPaid,
+        remainingBalance: runningBalance,
+      });
     } catch (error) {
       toast.error("Failed to fetch ledger data");
     } finally {
@@ -148,13 +184,13 @@ const ShopLedger = () => {
     try {
       if (editPaymentId) {
         await api.put(`/ledger/payments/${editPaymentId}`, paymentData);
-        toast.success("Payment updated successfully!");
+        toast.success(t("Payment updated successfully!"));
       } else {
         await api.post("/ledger/payments", {
           shopId: selectedShop,
           ...paymentData,
         });
-        toast.success("Payment added successfully!");
+        toast.success(t("Payment added successfully!"));
       }
 
       setPaymentData({
@@ -179,7 +215,9 @@ const ShopLedger = () => {
       className={`space-y-6 ${language === "ur" ? "text-right" : "text-left"}`}
     >
       {/* Header */}
-      <div className="print:hidden flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div
+        className={`print:hidden flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 ${language === "ur" ? "flex-row-reverse" : ""}`}
+      >
         <div>
           <h1
             className={`text-xl font-bold text-gray-800 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
@@ -217,18 +255,20 @@ const ShopLedger = () => {
         )}
       </div>
 
-      {/* Selectors */}
-      <div className="print:hidden bg-white p-6 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Selectors with Searchable Dropdown */}
+      <div
+        className={`print:hidden bg-white p-6 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-6 ${language === "ur" ? "text-right" : "text-left"}`}
+      >
         <div>
           <label
-            className={`block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
+            className={`block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
           >
             <Map size={16} /> {t("Select Route")}
           </label>
           <select
             value={selectedRoute}
             onChange={(e) => setSelectedRoute(e.target.value)}
-            className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500 ${language === "ur" ? "text-right" : ""}`}
+            className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500 bg-white ${language === "ur" ? "text-right" : "text-left"}`}
           >
             <option value="">{t("-- Select Route --")}</option>
             {routes.map((r) => (
@@ -238,25 +278,73 @@ const ShopLedger = () => {
             ))}
           </select>
         </div>
-        <div>
+
+        <div className="relative" ref={dropdownRef}>
           <label
-            className={`block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
+            className={`block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
           >
             <Store size={16} /> {t("Select Shop")}
           </label>
-          <select
-            value={selectedShop}
-            onChange={(e) => setSelectedShop(e.target.value)}
-            disabled={!selectedRoute}
-            className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none disabled:bg-gray-100 ${language === "ur" ? "text-right" : ""}`}
+          <div
+            className={`flex items-center border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus-within:ring-2 focus-within:ring-indigo-500 ${!selectedRoute ? "bg-gray-100 cursor-not-allowed" : ""} ${language === "ur" ? "flex-row-reverse" : ""}`}
           >
-            <option value="">{t("-- Select Shop --")}</option>
-            {shops.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.shopName} ({s.ownerName})
-              </option>
-            ))}
-          </select>
+            <Search size={16} className="text-gray-400 mx-2" />
+            <input
+              type="text"
+              placeholder={t("Search Shop by Name...")}
+              value={shopSearchText}
+              disabled={!selectedRoute}
+              onChange={(e) => {
+                setShopSearchText(e.target.value);
+                setIsDropdownOpen(true);
+              }}
+              onFocus={() => setIsDropdownOpen(true)}
+              className={`w-full outline-none bg-transparent ${language === "ur" ? "text-right" : "text-left"}`}
+            />
+          </div>
+
+          {/* Custom Search Dropdown List */}
+          {isDropdownOpen && selectedRoute && (
+            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              {shops
+                .filter(
+                  (s) =>
+                    s.shopName
+                      .toLowerCase()
+                      .includes(shopSearchText.toLowerCase()) ||
+                    s.ownerName
+                      .toLowerCase()
+                      .includes(shopSearchText.toLowerCase()),
+                )
+                .map((s) => (
+                  <div
+                    key={s._id}
+                    onClick={() => {
+                      setSelectedShop(s._id);
+                      setShopSearchText(`${s.shopName} (${s.ownerName})`);
+                      setIsDropdownOpen(false);
+                    }}
+                    className={`px-4 py-2 hover:bg-indigo-50 cursor-pointer text-sm text-gray-700 border-b last:border-b-0 ${language === "ur" ? "text-right" : "text-left"}`}
+                  >
+                    <span className="font-bold">{s.shopName}</span> -{" "}
+                    {s.ownerName}
+                  </div>
+                ))}
+              {shops.filter(
+                (s) =>
+                  s.shopName
+                    .toLowerCase()
+                    .includes(shopSearchText.toLowerCase()) ||
+                  s.ownerName
+                    .toLowerCase()
+                    .includes(shopSearchText.toLowerCase()),
+              ).length === 0 && (
+                <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                  No shops found
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -316,10 +404,10 @@ const ShopLedger = () => {
                   }
                   className={`w-full border rounded-lg px-3 py-2 outline-none bg-white ${language === "ur" ? "text-right" : ""}`}
                 >
-                  <option value="Debit">{t("Debit (Paid to Shop)")}</option>
-                  <option value="Credit">
-                    {t("Credit (Advance / Adjust)")}
+                  <option value="Debit">
+                    {t("Payment / Advance (Debit)")}
                   </option>
+                  <option value="Credit">{t("Adjustment (Credit)")}</option>
                 </select>
               </div>
               <div>
@@ -362,7 +450,7 @@ const ShopLedger = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-medium"
                 >
                   {loading
                     ? t("Saving...")
@@ -376,15 +464,21 @@ const ShopLedger = () => {
         )}
       </div>
 
-      {/* Ledger Table */}
-      {ledgerData && (
+      {/* Ledger Summary Cards & Table */}
+      {localSummary && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div
+            className={`grid grid-cols-1 md:grid-cols-4 gap-4 ${language === "ur" ? "text-right" : "text-left"}`}
+          >
             <div className="bg-white p-4 rounded-xl border-l-4 border-l-blue-500 shadow-sm">
               <p className="text-sm text-gray-500">{t("Total Collected")}</p>
               <p className="text-2xl font-bold text-gray-800">
-                {ledgerData.summary.totalCollectedKg}{" "}
-                <span className="text-sm">KG</span>
+                {localSummary.totalCollectedKg}{" "}
+                <span className="text-sm">KG</span> <br />
+                <span className="text-sm font-semibold text-blue-600">
+                  ({(localSummary.totalCollectedKg / 40).toFixed(2)} {t("Mann")}
+                  )
+                </span>
               </p>
             </div>
             <div className="bg-white p-4 rounded-xl border-l-4 border-l-green-500 shadow-sm">
@@ -392,19 +486,21 @@ const ShopLedger = () => {
                 {t("Total Payable (Credit)")}
               </p>
               <p className="text-2xl font-bold text-green-600">
-                Rs. {ledgerData.summary.totalPayableAmount.toLocaleString()}
+                Rs. {localSummary.totalPayableAmount.toLocaleString()}
               </p>
             </div>
             <div className="bg-white p-4 rounded-xl border-l-4 border-l-red-500 shadow-sm">
               <p className="text-sm text-gray-500">{t("Total Paid (Debit)")}</p>
               <p className="text-2xl font-bold text-red-600">
-                Rs. {ledgerData.summary.totalPaidAmount.toLocaleString()}
+                Rs. {localSummary.totalPaidAmount.toLocaleString()}
               </p>
             </div>
             <div className="bg-white p-4 rounded-xl border-l-4 border-l-indigo-500 shadow-sm">
               <p className="text-sm text-gray-500">{t("Remaining Balance")}</p>
-              <p className="text-2xl font-bold text-indigo-700">
-                Rs. {ledgerData.summary.remainingBalance.toLocaleString()}
+              <p
+                className={`text-2xl font-bold ${localSummary.remainingBalance < 0 ? "text-red-600" : "text-indigo-700"}`}
+              >
+                Rs. {localSummary.remainingBalance.toLocaleString()}
               </p>
             </div>
           </div>
@@ -470,7 +566,9 @@ const ShopLedger = () => {
                         className="border-b hover:bg-gray-50 text-sm"
                       >
                         <td className="px-6 py-3">
-                          {new Date(row.date).toLocaleDateString()}
+                          {new Date(row.date).toLocaleDateString(
+                            language === "ur" ? "ur-PK" : "en-US",
+                          )}
                         </td>
                         <td className="px-6 py-3">
                           {row.type === "Collection" ? (
@@ -531,11 +629,10 @@ const ShopLedger = () => {
                             : "-"}
                         </td>
                         <td
-                          className={`px-6 py-3 font-bold text-gray-800 bg-gray-50 ${language === "ur" ? "text-left" : "text-right"}`}
+                          className={`px-6 py-3 font-bold ${row.balance < 0 ? "text-red-600" : "text-gray-800"} bg-gray-50 ${language === "ur" ? "text-left" : "text-right"}`}
                         >
                           Rs. {row.balance.toLocaleString()}
                         </td>
-
                         {user?.role === "Admin" && (
                           <td className="px-6 py-3 text-center print:hidden">
                             {row.type === "Payment" ? (

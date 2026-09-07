@@ -11,7 +11,7 @@ export const LanguageProvider = ({ children }) => {
     localStorage.setItem("appLang", language);
   }, [language]);
 
-  // VIP Dictionary (100% COMPLETE APP WITH NEW TERMS)
+  // VIP Dictionary (100% COMPLETE APP WITH ALL NEW TERMS)
   const translations = {
     en: {
       // Menu & General
@@ -120,6 +120,10 @@ export const LanguageProvider = ({ children }) => {
       "Note:": "Note:",
       "Weight (KG)": "Weight (KG)",
       "Enter Weight (KG)": "Enter Weight (KG)",
+      "Search Shop by Name...": "Search Shop by Name...",
+      "Payment / Advance (Debit)": "Payment / Advance (Debit)",
+      "Adjustment (Credit)": "Adjustment (Credit)",
+      Mann: "Mann",
 
       // Factory Weight
       "Factory Weight & Reports": "Factory Weight & Reports",
@@ -241,7 +245,7 @@ export const LanguageProvider = ({ children }) => {
       "Total Shop KG": "Total Shop KG",
       "Total Factory KG": "Total Factory KG",
 
-      // Users & Settings (NEW)
+      // Users & Settings
       "User Management": "User Management",
       "Manage Admin and restricted Staff accounts":
         "Manage Admin and restricted Staff accounts",
@@ -396,6 +400,10 @@ export const LanguageProvider = ({ children }) => {
       "Note:": "نوٹ:",
       "Weight (KG)": "وزن (کلوگرام)",
       "Enter Weight (KG)": "وزن درج کریں (کلوگرام)",
+      "Search Shop by Name...": "دکان کا نام تلاش کریں...",
+      "Payment / Advance (Debit)": "ادائیگی / ایڈوانس (ڈیبٹ)",
+      "Adjustment (Credit)": "ایڈجسٹمنٹ (کریڈٹ)",
+      Mann: "من",
 
       // Factory Weight
       "Factory Weight & Reports": "فیکٹری کا وزن اور رپورٹس",
@@ -517,7 +525,7 @@ export const LanguageProvider = ({ children }) => {
       "Total Shop KG": "دکان کا کل کلوگرام",
       "Total Factory KG": "فیکٹری کا کل کلوگرام",
 
-      // Users & Settings (NEW)
+      // Users & Settings
       "User Management": "صارفین کا انتظام",
       "Manage Admin and restricted Staff accounts":
         "ایڈمن اور محدود سٹاف اکاؤنٹس کا انتظام کریں",
