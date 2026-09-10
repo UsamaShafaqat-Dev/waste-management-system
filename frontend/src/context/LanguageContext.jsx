@@ -11,14 +11,15 @@ export const LanguageProvider = ({ children }) => {
     // 1. Language save karna
     localStorage.setItem("appLang", language);
 
-    // 🔥 2. JADOO: Global RTL (Right-to-Left) Logic
-    // Is se poori website ka rukh automatically Urdu ke liye theek ho jayega
+    // 🔥 2. JADOO: Global RTL aur Font Logic
     if (language === "ur") {
       document.documentElement.dir = "rtl";
       document.documentElement.lang = "ur";
+      document.body.classList.add("font-urdu"); // 👈 NAYA: Urdu Font Class Add
     } else {
       document.documentElement.dir = "ltr";
       document.documentElement.lang = "en";
+      document.body.classList.remove("font-urdu"); // 👈 NAYA: Urdu Font Class Remove
     }
   }, [language]);
 

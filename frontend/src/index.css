@@ -3,3 +3,26 @@
 body {
   background-color: #f9fafb; /* gray-50 */
 }
+
+/* ========================================== */
+/* 🔥 JAMEEL NOORI NASTALEEQ FONT JADOO 🔥 */
+/* ========================================== */
+
+@font-face {
+  font-family: "Jameel Noori Nastaleeq";
+  src:
+    url("https://cdn.jsdelivr.net/gh/Nafees-Urdu/Nafees-Nastaleeq@master/JameelNooriNastaleeq.woff2")
+      format("woff2"),
+    url("https://cdn.jsdelivr.net/gh/Nafees-Urdu/Nafees-Nastaleeq@master/JameelNooriNastaleeq.ttf")
+      format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Jab body par .font-urdu class lagegi, toh har cheez ka font badal jayega */
+body.font-urdu * {
+  font-family: "Jameel Noori Nastaleeq", sans-serif !important;
+  line-height: 1.8 !important; /* Nastaleeq ko thori extra line-height chahiye hoti hai */
+  letter-spacing: normal !important;
+}
