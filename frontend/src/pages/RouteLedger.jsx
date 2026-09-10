@@ -51,7 +51,6 @@ const RouteLedger = () => {
     <div
       className={`space-y-6 ${language === "ur" ? "text-right" : "text-left"}`}
     >
-      {/* Header */}
       <div
         className={`print:hidden bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
       >
@@ -68,7 +67,6 @@ const RouteLedger = () => {
         </div>
       </div>
 
-      {/* Filters Section */}
       <div
         className={`print:hidden bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-wrap items-end gap-4 ${language === "ur" ? "flex-row-reverse" : ""}`}
       >
@@ -144,7 +142,6 @@ const RouteLedger = () => {
         </button>
       </div>
 
-      {/* Summary Results */}
       {summaryData && (
         <div className="space-y-6">
           <div
@@ -217,6 +214,12 @@ const RouteLedger = () => {
               >
                 <thead>
                   <tr className="text-xs text-gray-500 uppercase tracking-wider border-b print:border-b-2">
+                    {/* 🔥 NAYA: Sr. No Column */}
+                    <th
+                      className={`px-4 py-3 font-medium w-16 ${language === "ur" ? "text-right" : "text-left"}`}
+                    >
+                      {t("Sr. No")}
+                    </th>
                     <th
                       className={`px-4 py-3 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
                     >
@@ -253,7 +256,7 @@ const RouteLedger = () => {
                   {summaryData.shopBreakdown.length === 0 ? (
                     <tr>
                       <td
-                        colSpan="6"
+                        colSpan="7"
                         className="text-center py-6 text-gray-400"
                       >
                         {t("No data found for this month.")}
@@ -265,10 +268,13 @@ const RouteLedger = () => {
                         key={index}
                         className="border-b hover:bg-gray-50 text-sm print:text-black"
                       >
+                        {/* 🔥 NAYA: Sr. No Display (Read-only) */}
+                        <td className="px-4 py-3 text-gray-500 font-medium">
+                          {shop.serialNumber || index + 1}
+                        </td>
                         <td className="px-4 py-3 font-medium text-gray-800">
                           {shop.shopName}
                         </td>
-                        {/* 🔥 NAYA: Rate ki Safe Handling */}
                         <td
                           className={`px-4 py-3 text-gray-500 print:text-black ${language === "ur" ? "text-left" : "text-right"}`}
                         >
@@ -302,7 +308,7 @@ const RouteLedger = () => {
                   <tfoot>
                     <tr className="bg-gray-800 text-white print:bg-gray-200 print:text-black font-bold text-sm">
                       <td
-                        colSpan="2"
+                        colSpan="3" // 🔥 Span barha diya kyunke ek column zyada ho gaya hai
                         className={`px-4 py-4 ${language === "ur" ? "text-left" : "text-right"}`}
                       >
                         {t("Route Totals:")}

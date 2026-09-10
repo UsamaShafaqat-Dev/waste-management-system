@@ -3,6 +3,7 @@ const FactoryWeight = require("../models/FactoryWeight");
 const Payment = require("../models/Payment");
 const Shop = require("../models/Shop");
 const Route = require("../models/Route");
+const MonthlyRate = require("../models/MonthlyRate");
 
 // @desc    Get Route-Wise Monthly Ledger Summary
 // @route   GET /api/summary/route-ledger?routeId=XYZ&month=8&year=2026
@@ -16,19 +17,22 @@ const getRouteMonthlySummary = async (req, res) => {
         .json({ message: "Route, Month, and Year are required" });
     }
 
-    // Set date boundaries for the selected month
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
-    // 1. Get Route and Vehicle Info[cite: 1]
+    // Format YYYY-MM for MonthlyRate matching
+    const monthStr = `${year}-${String(month).padStart(2, "0")}`;
+
     const routeInfo = await Route.findById(routeId).populate("assignedVehicle");
     if (!routeInfo) return res.status(404).json({ message: "Route not found" });
 
-    // 2. Get all shops for this route[cite: 1]
-    const shops = await Shop.find({ assignedRoute: routeId, status: "Active" });
+    // 🔥 NAYA: Shops ko serialNumber ke hisab se sort kar ke mangwaya
+    const shops = await Shop.find({
+      assignedRoute: routeId,
+      status: "Active",
+    }).sort({ serialNumber: 1 });
     const shopIds = shops.map((s) => s._id);
 
-    // 3. Fetch data for the selected month[cite: 1]
     const collections = await DailyCollection.find({
       route: routeId,
       date: { $gte: startDate, $lte: endDate },
@@ -44,18 +48,21 @@ const getRouteMonthlySummary = async (req, res) => {
       date: { $gte: startDate, $lte: endDate },
     });
 
-    // 4. Aggregate Data[cite: 1]
+    const monthlyRates = await MonthlyRate.find({
+      route: routeId,
+      month: monthStr,
+    });
+
     let totalShopKg = 0;
     let totalFactoryKg = 0;
-    let totalAmount = 0; // Credit
-    let totalPaid = 0; // Debit
+    let totalAmount = 0;
+    let totalPaid = 0;
 
-    // Calculate Total Factory KG
     factoryWeights.forEach((fw) => {
       totalFactoryKg += fw.factoryWeight;
     });
 
-    // Shop breakdown calculations[cite: 1]
+    // Shop breakdown calculations
     const shopBreakdown = shops.map((shop) => {
       const shopCollections = collections.filter(
         (c) => c.shop.toString() === shop._id.toString(),
@@ -64,9 +71,34 @@ const getRouteMonthlySummary = async (req, res) => {
         (p) => p.shop.toString() === shop._id.toString(),
       );
 
+      // 🔥 NAYA: Rate nikalne ka behtareen tareeqa
+      const shopRateObj = monthlyRates.find(
+        (r) => r.shop.toString() === shop._id.toString(),
+      );
+      let shopRate = shopRateObj ? shopRateObj.rate : 0;
+
+      // Agar monthly rate 0 hai, toh backup ke tor par purana rate utha lay (taake 0 show na ho)
+      const displayRate = shopRate > 0 ? shopRate : shop.ratePerKg || 0;
+
       const kg = shopCollections.reduce((sum, c) => sum + c.weightKg, 0);
-      const credit = shopCollections.reduce((sum, c) => sum + c.amount, 0);
-      const debit = shopPayments.reduce((sum, p) => sum + p.amount, 0);
+
+      let wasteBill = kg * shopRate;
+      // Agar naye system se bill 0 ban raha hai, toh purane records ka bill use karein
+      if (wasteBill === 0) {
+        wasteBill = shopCollections.reduce(
+          (sum, c) => sum + (c.amount || 0),
+          0,
+        );
+      }
+
+      const creditPayments = shopPayments
+        .filter((p) => p.paymentType === "Credit")
+        .reduce((sum, p) => sum + p.amount, 0);
+      const credit = wasteBill + creditPayments;
+
+      const debit = shopPayments
+        .filter((p) => p.paymentType !== "Credit")
+        .reduce((sum, p) => sum + p.amount, 0);
       const remaining = credit - debit;
 
       totalShopKg += kg;
@@ -75,8 +107,9 @@ const getRouteMonthlySummary = async (req, res) => {
 
       return {
         shopId: shop._id,
+        serialNumber: shop.serialNumber, // 🔥 NAYA: Serial Number Bhej diya
         shopName: shop.shopName,
-        rate: shop.ratePerKg,
+        rate: displayRate, // 🔥 NAYA: Rate bhej diya jo Frontend par show hoga
         kg,
         credit,
         debit,
@@ -84,7 +117,6 @@ const getRouteMonthlySummary = async (req, res) => {
       };
     });
 
-    // 5. Send Response
     res.status(200).json({
       routeInfo: {
         routeName: routeInfo.routeName,
