@@ -13,11 +13,13 @@ import {
   Calendar,
   Table as TableIcon,
   List,
+  FileSpreadsheet,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
 import { LanguageContext } from "../context/LanguageContext";
+import * as XLSX from "xlsx"; // 🔥 NAYA: Excel Export ke liye
 
 const ShopLedger = () => {
   const { user } = useContext(AuthContext);
@@ -45,8 +47,7 @@ const ShopLedger = () => {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [editPaymentId, setEditPaymentId] = useState(null);
 
-  // 🔥 NAYA: View Mode (Ledger vs 1-31 Register)
-  const [viewMode, setViewMode] = useState("ledger"); // "ledger" | "register"
+  const [viewMode, setViewMode] = useState("ledger");
 
   const [paymentData, setPaymentData] = useState({
     date: new Date().toISOString().split("T")[0],
@@ -151,19 +152,6 @@ const ShopLedger = () => {
     fetchLedger();
   }, [selectedShop, selectedMonth]);
 
-  const handleEditClick = (payment) => {
-    setEditPaymentId(payment._id);
-    setPaymentData({
-      date: new Date(payment.date).toISOString().split("T")[0],
-      amount: payment.amount,
-      paymentType: payment.paymentType || "Debit",
-      paymentMethod: payment.paymentMethod,
-      notes: payment.notes || "",
-    });
-    setShowPaymentForm(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
     if (!paymentData.amount || paymentData.amount <= 0) {
@@ -200,20 +188,36 @@ const ShopLedger = () => {
     }
   };
 
-  // 🔥 NAYA: 1-31 Register Generator Function
+  const handleEditClick = (payment) => {
+    setEditPaymentId(payment._id);
+    setPaymentData({
+      date: new Date(payment.date).toISOString().split("T")[0],
+      amount: payment.amount,
+      paymentType: payment.paymentType || "Debit",
+      paymentMethod: payment.paymentMethod,
+      notes: payment.notes || "",
+    });
+    setShowPaymentForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // 🔥 NAYA: Advanced 1-31 Register Generator (Daily Balance ke sath)
   const generateDailyRegister = () => {
-    if (!ledgerData || !selectedMonth) return [];
+    if (!ledgerData || !selectedMonth) return null;
 
     const [year, month] = selectedMonth.split("-");
-    const daysInMonth = new Date(year, month, 0).getDate(); // Us mahine ke total din
+    const daysInMonth = new Date(year, month, 0).getDate();
     const collections = ledgerData.collections || [];
+    const payments = ledgerData.payments || [];
 
     const dailyData = [];
     let totalRegisterKg = 0;
-    let totalRegisterAmount = 0;
+    let totalRegisterWasteBill = 0;
+    let totalRegisterPaid = 0;
+    let currentBalance = openingBalance;
 
     for (let day = 1; day <= daysInMonth; day++) {
-      // Find agar is din ki koi collection hai (timezone issue se bachne k lye date compare kar rhe hain)
+      // 1. Collections for the day
       const dailyColls = collections.filter((c) => {
         const cDate = new Date(c.date);
         return (
@@ -221,28 +225,121 @@ const ShopLedger = () => {
         );
       });
 
-      // Agar ek din mein multiple collections hon (wese toh error handle kiya hai par ehtiyatan)
+      // 2. Payments for the day
+      const dailyPays = payments.filter((p) => {
+        const pDate = new Date(p.date);
+        return (
+          pDate.getDate() === day && pDate.getMonth() + 1 === parseInt(month)
+        );
+      });
+
       const dayWeight = dailyColls.reduce((sum, c) => sum + c.weightKg, 0);
       const dayRate = dailyColls.length > 0 ? dailyColls[0].ratePerKg : 0;
-      const dayAmount = dailyColls.reduce((sum, c) => sum + c.amount, 0);
+      const dayWasteBill = dailyColls.reduce((sum, c) => sum + c.amount, 0);
+
+      // Debit = Paid to Shop | Credit = Adjustment (Added to bill)
+      const dayPaid = dailyPays
+        .filter((p) => p.paymentType !== "Credit")
+        .reduce((sum, p) => sum + p.amount, 0);
+      const dayCreditAdj = dailyPays
+        .filter((p) => p.paymentType === "Credit")
+        .reduce((sum, p) => sum + p.amount, 0);
+
+      // Balance Logic: Pichla Balance + Aaj Ka Bill + Adjustments - Aaj Ki Payment
+      currentBalance = currentBalance + dayWasteBill + dayCreditAdj - dayPaid;
 
       totalRegisterKg += dayWeight;
-      totalRegisterAmount += dayAmount;
+      totalRegisterWasteBill += dayWasteBill + dayCreditAdj;
+      totalRegisterPaid += dayPaid;
 
       dailyData.push({
         day,
-        dateStr: `${day}-${month}-${year}`,
+        dateStr: `${day.toString().padStart(2, "0")}-${month}-${year}`,
         weight: dayWeight,
         rate: dayRate,
-        amount: dayAmount,
+        wasteBill: dayWasteBill,
+        paid: dayPaid,
+        creditAdj: dayCreditAdj,
+        balance: currentBalance,
       });
     }
 
-    return { dailyData, totalRegisterKg, totalRegisterAmount };
+    return {
+      dailyData,
+      totalRegisterKg,
+      totalRegisterWasteBill,
+      totalRegisterPaid,
+      finalBalance: currentBalance,
+    };
   };
 
   const registerReport =
     viewMode === "register" ? generateDailyRegister() : null;
+
+  // 🔥 NAYA: Excel Export Function
+  const exportToExcel = () => {
+    if (!registerReport) return;
+
+    const wsData = [
+      ["Waste Management System - Daily Register"],
+      [
+        `Shop Name: ${ledgerData.shopDetails?.shopName} (${ledgerData.shopDetails?.ownerName})`,
+      ],
+      [`Month: ${selectedMonth}`],
+      [], // Empty row
+      ["Opening Balance (Rs):", openingBalance],
+      [], // Empty row
+      [
+        "Date",
+        "Weight (KG)",
+        "Rate (Rs)",
+        "Waste Bill (Rs)",
+        "Paid/Advance (Rs)",
+        "Balance (Rs)",
+      ],
+    ];
+
+    registerReport.dailyData.forEach((d) => {
+      wsData.push([
+        d.dateStr,
+        d.weight || 0,
+        d.rate || 0,
+        d.wasteBill + d.creditAdj || 0,
+        d.paid || 0,
+        d.balance,
+      ]);
+    });
+
+    wsData.push([]);
+    wsData.push([
+      "TOTAL",
+      registerReport.totalRegisterKg,
+      "",
+      registerReport.totalRegisterWasteBill,
+      registerReport.totalRegisterPaid,
+      registerReport.finalBalance,
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Daily_Register");
+
+    // Auto-adjust column widths
+    const wscols = [
+      { wch: 15 }, // Date
+      { wch: 15 }, // Weight
+      { wch: 10 }, // Rate
+      { wch: 15 }, // Waste Bill
+      { wch: 20 }, // Paid
+      { wch: 15 }, // Balance
+    ];
+    ws["!cols"] = wscols;
+
+    XLSX.writeFile(
+      wb,
+      `ShopLedger_${ledgerData.shopDetails?.shopName}_${selectedMonth}.xlsx`,
+    );
+  };
 
   return (
     <div
@@ -263,6 +360,15 @@ const ShopLedger = () => {
           <div
             className={`flex gap-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
           >
+            {/* Excel Button */}
+            {viewMode === "register" && (
+              <button
+                onClick={exportToExcel}
+                className={`bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
+              >
+                <FileSpreadsheet size={18} /> Excel
+              </button>
+            )}
             <button
               onClick={() => window.print()}
               className={`bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
@@ -273,7 +379,7 @@ const ShopLedger = () => {
               onClick={() => {
                 setShowPaymentForm(!showPaymentForm);
                 if (showPaymentForm) setEditPaymentId(null);
-                setViewMode("ledger"); // Payment add karte waqt ledger view khol dein
+                setViewMode("ledger");
               }}
               className={`bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
             >
@@ -394,7 +500,6 @@ const ShopLedger = () => {
         </div>
       </div>
 
-      {/* 🔥 NAYA: View Mode Toggle Buttons */}
       {ledgerData && (
         <div className="print:hidden flex justify-center mt-4">
           <div className="bg-gray-100 p-1 rounded-lg flex shadow-sm border border-gray-200">
@@ -438,6 +543,7 @@ const ShopLedger = () => {
               onSubmit={handlePaymentSubmit}
               className={`grid grid-cols-1 md:grid-cols-5 gap-4 ${language === "ur" ? "text-right" : "text-left"}`}
             >
+              {/* Payment Form Inputs remain the same */}
               <div>
                 <label className="block text-sm text-indigo-700 mb-1">
                   {t("Date")}
@@ -540,66 +646,63 @@ const ShopLedger = () => {
         )}
       </div>
 
-      {/* ===================== VIEWS ===================== */}
       {localSummary && (
         <div className="space-y-6">
-          {/* Print Header for Both Views */}
-          <div className="hidden print:block text-center mb-6">
-            <h2 className="text-2xl font-bold border-b pb-2">
+          <div className="hidden print:block text-center mb-4">
+            <h2 className="text-2xl font-bold border-b pb-2 text-black">
               {ledgerData.shopDetails?.shopName} (
               {ledgerData.shopDetails?.ownerName})
             </h2>
-            <p className="text-gray-600 mt-2 font-medium">
+            <p className="text-gray-800 mt-2 font-medium">
               Month:{" "}
               {new Date(selectedMonth).toLocaleString("en-US", {
                 month: "long",
                 year: "numeric",
               })}{" "}
-              | View: {viewMode === "ledger" ? "Ledger" : "1-31 Daily Register"}
+              | View:{" "}
+              {viewMode === "ledger"
+                ? "Ledger / History"
+                : "1-31 Daily Register"}
             </p>
           </div>
 
-          {/* ----- LEDGER VIEW ----- */}
           {viewMode === "ledger" && (
             <>
+              {/* Ledger View Code Remains the Same */}
               <div
                 className={`grid grid-cols-1 md:grid-cols-4 gap-4 ${language === "ur" ? "text-right" : "text-left"}`}
               >
-                <div className="bg-white p-4 rounded-xl border-l-4 border-l-blue-500 shadow-sm">
-                  <p className="text-sm text-gray-500">
+                <div className="bg-white p-4 rounded-xl border-l-4 border-l-blue-500 shadow-sm print:border border-gray-300">
+                  <p className="text-sm text-gray-500 print:text-black">
                     {t("Total Collected")}
                   </p>
                   <p className="text-2xl font-bold text-gray-800">
                     {localSummary.totalCollectedKg}{" "}
-                    <span className="text-sm">KG</span> <br />
-                    <span className="text-sm font-semibold text-blue-600">
-                      ({(localSummary.totalCollectedKg / 40).toFixed(2)}{" "}
-                      {t("Mann")})
-                    </span>
+                    <span className="text-sm">KG</span>
                   </p>
                 </div>
-                <div className="bg-white p-4 rounded-xl border-l-4 border-l-green-500 shadow-sm">
-                  <p className="text-sm text-gray-500">
+                <div className="bg-white p-4 rounded-xl border-l-4 border-l-green-500 shadow-sm print:border border-gray-300">
+                  <p className="text-sm text-gray-500 print:text-black">
                     {t("Total Payable (Credit)")}
                   </p>
-                  <p className="text-2xl font-bold text-green-600">
+                  <p className="text-2xl font-bold text-green-600 print:text-black">
                     Rs. {localSummary.totalPayableAmount.toLocaleString()}
                   </p>
                 </div>
-                <div className="bg-white p-4 rounded-xl border-l-4 border-l-red-500 shadow-sm">
-                  <p className="text-sm text-gray-500">
+                <div className="bg-white p-4 rounded-xl border-l-4 border-l-red-500 shadow-sm print:border border-gray-300">
+                  <p className="text-sm text-gray-500 print:text-black">
                     {t("Total Paid (Debit)")}
                   </p>
-                  <p className="text-2xl font-bold text-red-600">
+                  <p className="text-2xl font-bold text-red-600 print:text-black">
                     Rs. {localSummary.totalPaidAmount.toLocaleString()}
                   </p>
                 </div>
-                <div className="bg-white p-4 rounded-xl border-l-4 border-l-indigo-500 shadow-sm">
-                  <p className="text-sm text-gray-500">
+                <div className="bg-white p-4 rounded-xl border-l-4 border-l-indigo-500 shadow-sm print:border border-gray-300">
+                  <p className="text-sm text-gray-500 print:text-black">
                     {t("Remaining Balance")}
                   </p>
                   <p
-                    className={`text-2xl font-bold ${localSummary.remainingBalance < 0 ? "text-red-600" : "text-indigo-700"}`}
+                    className={`text-2xl font-bold ${localSummary.remainingBalance < 0 ? "text-red-600" : "text-indigo-700"} print:text-black`}
                   >
                     Rs. {localSummary.remainingBalance.toLocaleString()}
                   </p>
@@ -607,19 +710,19 @@ const ShopLedger = () => {
               </div>
 
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto print:overflow-visible print:w-full">
                   <table
-                    className={`w-full border-collapse min-w-[800px] ${language === "ur" ? "text-right" : "text-left"}`}
+                    className={`w-full border-collapse min-w-[800px] print:min-w-full ${language === "ur" ? "text-right" : "text-left"}`}
                   >
                     <thead>
-                      <tr className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
+                      <tr className="text-xs text-gray-500 uppercase bg-gray-50 border-b print:bg-white print:text-black">
                         <th
                           className={`px-6 py-3 w-16 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
                         >
                           {t("Sr. No")}
                         </th>
                         <th
-                          className={`px-6 py-3 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
+                          className={`px-6 py-3 font-medium whitespace-nowrap ${language === "ur" ? "text-right" : "text-left"}`}
                         >
                           {t("Date")}
                         </th>
@@ -656,21 +759,16 @@ const ShopLedger = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="bg-indigo-50 border-b border-indigo-100">
+                      <tr className="bg-indigo-50 border-b border-indigo-100 print:bg-gray-100 print:border-gray-300">
                         <td className="px-6 py-3" colSpan="6">
                           <span
-                            className={`font-bold text-indigo-900 uppercase ${language === "ur" ? "float-right" : ""}`}
+                            className={`font-bold text-indigo-900 print:text-black uppercase ${language === "ur" ? "float-right" : ""}`}
                           >
-                            {t("Opening Balance")} (For{" "}
-                            {new Date(selectedMonth).toLocaleString(
-                              language === "ur" ? "ur-PK" : "en-US",
-                              { month: "long", year: "numeric" },
-                            )}
-                            )
+                            {t("Opening Balance")}
                           </span>
                         </td>
                         <td
-                          className={`px-6 py-3 font-black text-indigo-900 ${language === "ur" ? "text-left" : "text-right"}`}
+                          className={`px-6 py-3 font-black text-indigo-900 print:text-black ${language === "ur" ? "text-left" : "text-right"}`}
                         >
                           Rs. {openingBalance.toLocaleString()}
                         </td>
@@ -679,109 +777,87 @@ const ShopLedger = () => {
                         )}
                       </tr>
 
-                      {ledgerHistory.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={user?.role === "Admin" ? 8 : 7}
-                            className="text-center py-8 text-gray-400"
-                          >
-                            {t("No transactions found for this month.")}
+                      {ledgerHistory.map((row, index) => (
+                        <tr
+                          key={index}
+                          className="border-b hover:bg-gray-50 text-sm print:text-black"
+                        >
+                          <td className="px-6 py-3 font-medium text-gray-500 print:text-black">
+                            {index + 1}
                           </td>
-                        </tr>
-                      ) : (
-                        ledgerHistory.map((row, index) => (
-                          <tr
-                            key={index}
-                            className="border-b hover:bg-gray-50 text-sm"
-                          >
-                            <td className="px-6 py-3 font-medium text-gray-500">
-                              {index + 1}
-                            </td>
-                            <td className="px-6 py-3">
-                              {new Date(row.date).toLocaleDateString(
-                                language === "ur" ? "ur-PK" : "en-US",
-                              )}
-                            </td>
-                            <td className="px-6 py-3">
-                              {row.type === "Collection" ? (
-                                <span
-                                  className={`flex items-center gap-1 text-green-700 ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
-                                >
-                                  <ArrowDownRight
-                                    size={14}
-                                    className="print:hidden"
-                                  />{" "}
-                                  {t("Waste Collection")}
-                                </span>
-                              ) : (
-                                <div>
-                                  <span
-                                    className={`flex items-center gap-1 font-medium ${row.paymentType === "Credit" ? "text-green-700" : "text-red-700"} ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
-                                  >
-                                    {row.paymentType === "Credit" ? (
-                                      <ArrowDownRight
-                                        size={14}
-                                        className="print:hidden"
-                                      />
-                                    ) : (
-                                      <ArrowUpRight
-                                        size={14}
-                                        className="print:hidden"
-                                      />
-                                    )}
-                                    {t("Payment")} - {t(row.paymentMethod)}
-                                  </span>
-                                  {row.notes && (
-                                    <div className="text-xs text-gray-500 mt-1 font-medium">
-                                      {t("Note:")} {row.notes}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </td>
-                            <td
-                              className={`px-6 py-3 text-gray-500 ${language === "ur" ? "text-left" : "text-right"}`}
-                            >
-                              {row.type === "Collection"
-                                ? `${row.weightKg} KG @ Rs.${row.ratePerKg || row.rate}`
-                                : "-"}
-                            </td>
-                            <td
-                              className={`px-6 py-3 text-red-600 font-medium ${language === "ur" ? "text-left" : "text-right"}`}
-                            >
-                              {row.debit > 0
-                                ? `Rs. ${row.debit.toLocaleString()}`
-                                : "-"}
-                            </td>
-                            <td
-                              className={`px-6 py-3 text-green-600 font-medium ${language === "ur" ? "text-left" : "text-right"}`}
-                            >
-                              {row.credit > 0
-                                ? `Rs. ${row.credit.toLocaleString()}`
-                                : "-"}
-                            </td>
-                            <td
-                              className={`px-6 py-3 font-bold ${row.balance < 0 ? "text-red-600" : "text-gray-800"} bg-gray-50 ${language === "ur" ? "text-left" : "text-right"}`}
-                            >
-                              Rs. {row.balance.toLocaleString()}
-                            </td>
-                            {user?.role === "Admin" && (
-                              <td className="px-6 py-3 text-center print:hidden">
-                                {row.type === "Payment" ? (
-                                  <button
-                                    onClick={() => handleEditClick(row)}
-                                    className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition"
-                                  >
-                                    <Edit size={16} />
-                                  </button>
-                                ) : (
-                                  "-"
-                                )}
-                              </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            {new Date(row.date).toLocaleDateString(
+                              language === "ur" ? "ur-PK" : "en-US",
                             )}
-                          </tr>
-                        ))
-                      )}
+                          </td>
+                          <td className="px-6 py-3">
+                            {row.type === "Collection" ? (
+                              <span
+                                className={`flex items-center gap-1 text-green-700 print:text-black ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
+                              >
+                                <ArrowDownRight
+                                  size={14}
+                                  className="print:hidden"
+                                />{" "}
+                                {t("Waste Collection")}
+                              </span>
+                            ) : (
+                              <div>
+                                <span
+                                  className={`flex items-center gap-1 font-medium ${row.paymentType === "Credit" ? "text-green-700" : "text-red-700"} print:text-black ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
+                                >
+                                  {t("Payment")} - {t(row.paymentMethod)}
+                                </span>
+                                {row.notes && (
+                                  <div className="text-xs text-gray-500 print:text-black mt-1 font-medium">
+                                    {t("Note:")} {row.notes}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td
+                            className={`px-6 py-3 text-gray-500 print:text-black ${language === "ur" ? "text-left" : "text-right"}`}
+                          >
+                            {row.type === "Collection"
+                              ? `${row.weightKg} KG @ Rs.${row.ratePerKg || row.rate}`
+                              : "-"}
+                          </td>
+                          <td
+                            className={`px-6 py-3 text-red-600 print:text-black font-medium ${language === "ur" ? "text-left" : "text-right"}`}
+                          >
+                            {row.debit > 0
+                              ? `Rs. ${row.debit.toLocaleString()}`
+                              : "-"}
+                          </td>
+                          <td
+                            className={`px-6 py-3 text-green-600 print:text-black font-medium ${language === "ur" ? "text-left" : "text-right"}`}
+                          >
+                            {row.credit > 0
+                              ? `Rs. ${row.credit.toLocaleString()}`
+                              : "-"}
+                          </td>
+                          <td
+                            className={`px-6 py-3 font-bold ${row.balance < 0 ? "text-red-600" : "text-gray-800"} print:text-black bg-gray-50 print:bg-white ${language === "ur" ? "text-left" : "text-right"}`}
+                          >
+                            Rs. {row.balance.toLocaleString()}
+                          </td>
+                          {user?.role === "Admin" && (
+                            <td className="px-6 py-3 text-center print:hidden">
+                              {row.type === "Payment" ? (
+                                <button
+                                  onClick={() => handleEditClick(row)}
+                                  className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                              ) : (
+                                "-"
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -789,93 +865,130 @@ const ShopLedger = () => {
             </>
           )}
 
-          {/* ----- 1-31 REGISTER VIEW ----- */}
+          {/* ----- 🔥 NAYA: VIP 1-31 REGISTER VIEW (With Daily Balance) ----- */}
           {viewMode === "register" && registerReport && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="bg-indigo-600 text-white p-4 text-center font-bold text-lg">
-                {t("Daily Register (1 to 31)")} -{" "}
-                {new Date(selectedMonth).toLocaleString("en-US", {
-                  month: "long",
-                  year: "numeric",
-                })}
-              </div>
-              <div className="overflow-x-auto">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-none print:shadow-none">
+              {/* VIP PDF Styling Container */}
+              <div className="overflow-x-auto print:overflow-visible print:w-full">
                 <table
-                  className={`w-full border-collapse ${language === "ur" ? "text-right" : "text-left"}`}
+                  className={`w-full border-collapse ${language === "ur" ? "text-right" : "text-left"} print:text-sm`}
                 >
                   <thead>
-                    <tr className="bg-indigo-50 border-b border-indigo-200 text-indigo-900 text-sm">
+                    <tr className="bg-gray-800 text-white print:bg-gray-200 print:text-black text-sm">
                       <th
-                        className={`px-4 py-3 font-bold border-r border-indigo-200 w-24 ${language === "ur" ? "text-right" : "text-center"}`}
+                        className={`px-3 py-2 print:p-1 border border-gray-300 font-bold whitespace-nowrap ${language === "ur" ? "text-right" : "text-center"}`}
                       >
                         {t("Date")}
                       </th>
                       <th
-                        className={`px-4 py-3 font-bold border-r border-indigo-200 ${language === "ur" ? "text-left" : "text-center"}`}
+                        className={`px-3 py-2 print:p-1 border border-gray-300 font-bold ${language === "ur" ? "text-left" : "text-center"}`}
                       >
                         {t("Weight (KG)")}
                       </th>
                       <th
-                        className={`px-4 py-3 font-bold border-r border-indigo-200 ${language === "ur" ? "text-left" : "text-center"}`}
+                        className={`px-3 py-2 print:p-1 border border-gray-300 font-bold ${language === "ur" ? "text-left" : "text-center"}`}
                       >
                         {t("Rate / KG")}
                       </th>
                       <th
-                        className={`px-4 py-3 font-bold ${language === "ur" ? "text-left" : "text-center"}`}
+                        className={`px-3 py-2 print:p-1 border border-gray-300 font-bold ${language === "ur" ? "text-left" : "text-center"}`}
                       >
-                        {t("Amount (Rs)")}
+                        {t("Waste Bill")}
+                      </th>
+                      <th
+                        className={`px-3 py-2 print:p-1 border border-gray-300 font-bold ${language === "ur" ? "text-left" : "text-center"}`}
+                      >
+                        {t("Paid/Advance")}
+                      </th>
+                      <th
+                        className={`px-3 py-2 print:p-1 border border-gray-300 font-bold ${language === "ur" ? "text-left" : "text-center"}`}
+                      >
+                        {t("Daily Balance")}
                       </th>
                     </tr>
                   </thead>
                   <tbody>
+                    <tr className="bg-gray-100 print:bg-white text-sm">
+                      <td
+                        colSpan="5"
+                        className="px-3 py-2 print:p-1 border border-gray-300 font-bold text-gray-800 print:text-black text-right"
+                      >
+                        {t("Opening Balance:")}
+                      </td>
+                      <td className="px-3 py-2 print:p-1 border border-gray-300 font-bold text-indigo-700 print:text-black text-center">
+                        Rs. {openingBalance.toLocaleString()}
+                      </td>
+                    </tr>
                     {registerReport.dailyData.map((dayData, index) => (
                       <tr
                         key={index}
-                        className="border-b hover:bg-gray-50 transition-colors"
+                        className="hover:bg-gray-50 transition-colors text-sm"
                       >
                         <td
-                          className={`px-4 py-2 font-bold text-gray-700 bg-gray-50 border-r border-gray-200 ${language === "ur" ? "text-right" : "text-center"}`}
+                          className={`px-3 py-2 print:p-1 font-bold text-gray-700 print:text-black bg-gray-50 print:bg-white border border-gray-300 whitespace-nowrap ${language === "ur" ? "text-right" : "text-center"}`}
                         >
                           {dayData.dateStr}
                         </td>
                         <td
-                          className={`px-4 py-2 font-medium ${dayData.weight > 0 ? "text-blue-700" : "text-gray-400"} border-r border-gray-200 ${language === "ur" ? "text-left" : "text-center"}`}
+                          className={`px-3 py-2 print:p-1 font-medium ${dayData.weight > 0 ? "text-blue-700" : "text-gray-400"} print:text-black border border-gray-300 ${language === "ur" ? "text-left" : "text-center"}`}
                         >
-                          {dayData.weight > 0 ? `${dayData.weight} KG` : "0 KG"}
+                          {dayData.weight > 0 ? `${dayData.weight} KG` : "-"}
                         </td>
                         <td
-                          className={`px-4 py-2 text-gray-600 border-r border-gray-200 ${language === "ur" ? "text-left" : "text-center"}`}
+                          className={`px-3 py-2 print:p-1 text-gray-600 print:text-black border border-gray-300 ${language === "ur" ? "text-left" : "text-center"}`}
                         >
                           {dayData.rate > 0 ? `Rs. ${dayData.rate}` : "-"}
                         </td>
                         <td
-                          className={`px-4 py-2 font-semibold ${dayData.amount > 0 ? "text-green-700" : "text-gray-400"} ${language === "ur" ? "text-left" : "text-center"}`}
+                          className={`px-3 py-2 print:p-1 font-semibold ${dayData.wasteBill > 0 ? "text-indigo-600" : "text-gray-400"} print:text-black border border-gray-300 ${language === "ur" ? "text-left" : "text-center"}`}
                         >
-                          {dayData.amount > 0
-                            ? `Rs. ${dayData.amount.toLocaleString()}`
+                          {dayData.wasteBill > 0
+                            ? `Rs. ${dayData.wasteBill.toLocaleString()}`
                             : "-"}
+                        </td>
+                        <td
+                          className={`px-3 py-2 print:p-1 font-semibold ${dayData.paid > 0 ? "text-red-600" : "text-gray-400"} print:text-black border border-gray-300 ${language === "ur" ? "text-left" : "text-center"}`}
+                        >
+                          {dayData.paid > 0
+                            ? `Rs. ${dayData.paid.toLocaleString()}`
+                            : "-"}
+                        </td>
+                        <td
+                          className={`px-3 py-2 print:p-1 font-bold ${dayData.balance < 0 ? "text-red-600" : "text-gray-800"} print:text-black bg-gray-50 print:bg-white border border-gray-300 ${language === "ur" ? "text-left" : "text-center"}`}
+                        >
+                          Rs. {dayData.balance.toLocaleString()}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-gray-800 text-white font-bold text-lg">
+                    <tr className="bg-gray-800 text-white print:bg-gray-200 print:text-black font-bold">
                       <td
-                        className={`px-4 py-4 border-r border-gray-600 ${language === "ur" ? "text-right" : "text-center"}`}
+                        className={`px-3 py-3 print:p-2 border border-gray-600 ${language === "ur" ? "text-right" : "text-center"}`}
                       >
                         {t("Total")}
                       </td>
                       <td
-                        className={`px-4 py-4 border-r border-gray-600 ${language === "ur" ? "text-left" : "text-center"}`}
+                        className={`px-3 py-3 print:p-2 border border-gray-600 ${language === "ur" ? "text-left" : "text-center"}`}
                       >
                         {registerReport.totalRegisterKg} KG
                       </td>
-                      <td className="px-4 py-4 border-r border-gray-600"></td>
+                      <td className="px-3 py-3 print:p-2 border border-gray-600"></td>
                       <td
-                        className={`px-4 py-4 text-green-400 ${language === "ur" ? "text-left" : "text-center"}`}
+                        className={`px-3 py-3 print:p-2 text-indigo-300 print:text-black border border-gray-600 ${language === "ur" ? "text-left" : "text-center"}`}
                       >
                         Rs.{" "}
-                        {registerReport.totalRegisterAmount.toLocaleString()}
+                        {registerReport.totalRegisterWasteBill.toLocaleString()}
+                      </td>
+                      <td
+                        className={`px-3 py-3 print:p-2 text-red-300 print:text-black border border-gray-600 ${language === "ur" ? "text-left" : "text-center"}`}
+                      >
+                        Rs. {registerReport.totalRegisterPaid.toLocaleString()}
+                      </td>
+                      <td
+                        className={`px-3 py-3 print:p-2 bg-gray-900 print:bg-gray-300 border border-gray-600 ${language === "ur" ? "text-left" : "text-center"}`}
+                      >
+                        Rs. {registerReport.finalBalance.toLocaleString()}
                       </td>
                     </tr>
                   </tfoot>
