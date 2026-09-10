@@ -7,7 +7,7 @@ import {
   Trash2,
   Edit,
   AlertTriangle,
-  Loader2, // 🔥 NAYA: Loader icon import kiya
+  Loader2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
@@ -22,7 +22,6 @@ const Users = () => {
   const [editId, setEditId] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
 
-  // 🔥 NAYA: Delete Loading State
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -93,7 +92,6 @@ const Users = () => {
     setDeleteModal({ show: true, id });
   };
 
-  // 🔥 NAYA: Spinner ke sath Delete Logic
   const executeDelete = async () => {
     setIsDeleting(true);
     try {
@@ -171,6 +169,7 @@ const Users = () => {
                 value={formData.name}
                 onChange={handleChange}
                 required
+                maxLength="50" // 🔥 NAYA: Limit
                 className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-gray-500 ${language === "ur" ? "text-right" : "text-left"}`}
               />
             </div>
@@ -184,6 +183,7 @@ const Users = () => {
                 value={formData.email}
                 onChange={handleChange}
                 required
+                maxLength="50" // 🔥 NAYA: Limit
                 className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-gray-500 ${language === "ur" ? "text-right" : "text-left"}`}
               />
             </div>
@@ -201,6 +201,7 @@ const Users = () => {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
+                maxLength="50" // 🔥 NAYA: Limit
                 className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-gray-500 ${language === "ur" ? "text-right" : "text-left"}`}
                 placeholder={editId ? "••••••••" : t("Enter password")}
               />
@@ -356,7 +357,6 @@ const Users = () => {
                 >
                   {t("Cancel")}
                 </button>
-                {/* 🔥 NAYA: Button with Loading Spinner */}
                 <button
                   onClick={executeDelete}
                   disabled={isDeleting}
