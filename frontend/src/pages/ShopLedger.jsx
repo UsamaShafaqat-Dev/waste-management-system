@@ -10,6 +10,7 @@ import {
   Printer,
   Edit,
   Search,
+  Calendar,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
@@ -25,6 +26,11 @@ const ShopLedger = () => {
   const [selectedRoute, setSelectedRoute] = useState("");
   const [selectedShop, setSelectedShop] = useState("");
 
+  // 🔥 NAYA: Month Filter (Default Current Month)
+  const [selectedMonth, setSelectedMonth] = useState(
+    new Date().toISOString().slice(0, 7),
+  );
+
   const [shopSearchText, setShopSearchText] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -32,6 +38,7 @@ const ShopLedger = () => {
   const [ledgerData, setLedgerData] = useState(null);
   const [ledgerHistory, setLedgerHistory] = useState([]);
   const [localSummary, setLocalSummary] = useState(null);
+  const [openingBalance, setOpeningBalance] = useState(0);
 
   const [loading, setLoading] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -89,19 +96,16 @@ const ShopLedger = () => {
   }, [selectedRoute]);
 
   const fetchLedger = async () => {
-    if (!selectedShop) return;
+    if (!selectedShop || !selectedMonth) return;
     setLoading(true);
     try {
-      const { data } = await api.get(`/ledger/shop/${selectedShop}`);
+      const { data } = await api.get(
+        `/ledger/shop/${selectedShop}?month=${selectedMonth}`,
+      );
       setLedgerData(data);
-
-      let totalKg = 0;
-      let totalPayable = 0;
-      let totalPaid = 0;
+      setOpeningBalance(data.openingBalance);
 
       let history = (data.collections || []).map((c) => {
-        totalKg += c.weightKg;
-        totalPayable += c.amount;
         return {
           ...c,
           type: "Collection",
@@ -112,11 +116,6 @@ const ShopLedger = () => {
 
       const payments = (data.payments || []).map((p) => {
         const isCredit = p.paymentType === "Credit";
-        if (isCredit) {
-          totalPayable += p.amount;
-        } else {
-          totalPaid += p.amount;
-        }
         return {
           ...p,
           type: "Payment",
@@ -129,19 +128,15 @@ const ShopLedger = () => {
         (a, b) => new Date(a.date) - new Date(b.date),
       );
 
-      let runningBalance = 0;
+      // Start running balance with the Opening Balance
+      let runningBalance = data.openingBalance;
       history = history.map((item) => {
         runningBalance += item.credit - item.debit;
         return { ...item, balance: runningBalance };
       });
 
       setLedgerHistory(history);
-      setLocalSummary({
-        totalCollectedKg: totalKg,
-        totalPayableAmount: totalPayable,
-        totalPaidAmount: totalPaid,
-        remainingBalance: runningBalance,
-      });
+      setLocalSummary(data.summary);
     } catch (error) {
       toast.error("Failed to fetch ledger data");
     } finally {
@@ -151,7 +146,7 @@ const ShopLedger = () => {
 
   useEffect(() => {
     fetchLedger();
-  }, [selectedShop]);
+  }, [selectedShop, selectedMonth]); // 🔥 Ab month change hone par bhi data fetch hoga
 
   const handleEditClick = (payment) => {
     setEditPaymentId(payment._id);
@@ -247,7 +242,7 @@ const ShopLedger = () => {
       </div>
 
       <div
-        className={`print:hidden bg-white p-6 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-6 ${language === "ur" ? "text-right" : "text-left"}`}
+        className={`print:hidden bg-white p-6 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-3 gap-6 ${language === "ur" ? "text-right" : "text-left"}`}
       >
         <div>
           <label
@@ -334,6 +329,21 @@ const ShopLedger = () => {
               )}
             </div>
           )}
+        </div>
+
+        {/* 🔥 NAYA: Month Filter Box */}
+        <div>
+          <label
+            className={`block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
+          >
+            <Calendar size={16} /> {t("Select Month")}
+          </label>
+          <input
+            type="month"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500 bg-white ${language === "ur" ? "text-right" : "text-left"}`}
+          />
         </div>
       </div>
 
@@ -499,7 +509,6 @@ const ShopLedger = () => {
               >
                 <thead>
                   <tr className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
-                    {/* 🔥 NAYA: Sr. No Column Header */}
                     <th
                       className={`px-6 py-3 w-16 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
                     >
@@ -543,13 +552,37 @@ const ShopLedger = () => {
                   </tr>
                 </thead>
                 <tbody>
+                  {/* 🔥 NAYA: Opening Balance Row */}
+                  <tr className="bg-indigo-50 border-b border-indigo-100">
+                    <td className="px-6 py-3" colSpan="6">
+                      <span
+                        className={`font-bold text-indigo-900 uppercase ${language === "ur" ? "float-right" : ""}`}
+                      >
+                        {t("Opening Balance")} (For{" "}
+                        {new Date(selectedMonth).toLocaleString(
+                          language === "ur" ? "ur-PK" : "en-US",
+                          { month: "long", year: "numeric" },
+                        )}
+                        )
+                      </span>
+                    </td>
+                    <td
+                      className={`px-6 py-3 font-black text-indigo-900 ${language === "ur" ? "text-left" : "text-right"}`}
+                    >
+                      Rs. {openingBalance.toLocaleString()}
+                    </td>
+                    {user?.role === "Admin" && (
+                      <td className="print:hidden"></td>
+                    )}
+                  </tr>
+
                   {ledgerHistory.length === 0 ? (
                     <tr>
                       <td
                         colSpan={user?.role === "Admin" ? 8 : 7}
                         className="text-center py-8 text-gray-400"
                       >
-                        {t("No transactions found.")}
+                        {t("No transactions found for this month.")}
                       </td>
                     </tr>
                   ) : (
@@ -558,7 +591,6 @@ const ShopLedger = () => {
                         key={index}
                         className="border-b hover:bg-gray-50 text-sm"
                       >
-                        {/* 🔥 NAYA: Sr. No Column Data */}
                         <td className="px-6 py-3 font-medium text-gray-500">
                           {index + 1}
                         </td>
@@ -594,7 +626,6 @@ const ShopLedger = () => {
                                     className="print:hidden"
                                   />
                                 )}
-                                {/* 🔥 NAYA: Fixed Payment Formatting */}
                                 {t("Payment")} - {t(row.paymentMethod)}
                               </span>
                               {row.notes && (
