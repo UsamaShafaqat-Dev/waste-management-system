@@ -6,7 +6,7 @@ import {
   Edit,
   AlertTriangle,
   Loader2,
-} from "lucide-react"; // 🔥 NAYA: Loader2 import kiya
+} from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
@@ -21,8 +21,6 @@ const Vehicles = () => {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
-
-  // 🔥 NAYA: Delete loading state
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -90,9 +88,8 @@ const Vehicles = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // 🔥 NAYA: Delete function update (Spinner logic added)
   const executeDelete = async () => {
-    setIsDeleting(true); // Button disable & spinner ON
+    setIsDeleting(true);
     try {
       await api.delete(`/vehicles/${deleteModal.id}`);
       toast.success(t("Vehicle deleted successfully!"));
@@ -101,7 +98,7 @@ const Vehicles = () => {
     } catch (error) {
       toast.error(error.response?.data?.message || t("Error deleting"));
     } finally {
-      setIsDeleting(false); // Spinner OFF
+      setIsDeleting(false);
     }
   };
 
@@ -166,6 +163,7 @@ const Vehicles = () => {
                 value={formData.vehicleNumber}
                 onChange={handleChange}
                 required
+                maxLength="20" // 🔥 NAYA: Limit
                 className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
                 placeholder="e.g. AP-001"
               />
@@ -179,6 +177,7 @@ const Vehicles = () => {
                 name="vehicleName"
                 value={formData.vehicleName}
                 onChange={handleChange}
+                maxLength="50" // 🔥 NAYA: Limit
                 className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
                 placeholder="e.g. Shehzore"
               />
@@ -193,6 +192,7 @@ const Vehicles = () => {
                 value={formData.driverName}
                 onChange={handleChange}
                 required
+                maxLength="50" // 🔥 NAYA: Limit
                 className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
                 placeholder={t("Driver")}
               />
@@ -207,6 +207,7 @@ const Vehicles = () => {
                 value={formData.driverContact}
                 onChange={handleChange}
                 required
+                maxLength="15" // 🔥 NAYA: Limit
                 className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
                 placeholder="0300-0000000"
               />
@@ -252,6 +253,7 @@ const Vehicles = () => {
         </div>
       )}
 
+      {/* Table and Modal Code stays the same, I'm keeping it concise for token limit... */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table
@@ -392,7 +394,6 @@ const Vehicles = () => {
                 >
                   {t("Cancel")}
                 </button>
-                {/* 🔥 NAYA: Button with Loading Spinner */}
                 <button
                   onClick={executeDelete}
                   disabled={isDeleting}

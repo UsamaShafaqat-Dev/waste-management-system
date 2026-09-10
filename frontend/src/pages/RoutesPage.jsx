@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
-import { Map, Plus, Trash2, Edit, AlertTriangle, Loader2 } from "lucide-react"; // 🔥 NAYA: Loader2 import
+import { Map, Plus, Trash2, Edit, AlertTriangle, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
@@ -15,8 +15,6 @@ const RoutesPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
-
-  // 🔥 NAYA: Delete Spinner State
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -78,7 +76,6 @@ const RoutesPage = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // 🔥 NAYA: Execute Delete with Loading Spinner
   const executeDelete = async () => {
     setIsDeleting(true);
     try {
@@ -97,7 +94,6 @@ const RoutesPage = () => {
     <div
       className={`space-y-6 relative ${language === "ur" ? "text-right" : "text-left"}`}
     >
-      {/* Header */}
       <div
         className={`flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 ${language === "ur" ? "flex-row-reverse" : ""}`}
       >
@@ -124,7 +120,6 @@ const RoutesPage = () => {
         )}
       </div>
 
-      {/* Add / Edit Form */}
       {showForm && user?.role === "Admin" && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h2
@@ -146,6 +141,7 @@ const RoutesPage = () => {
                 value={formData.routeName}
                 onChange={handleChange}
                 required
+                maxLength="50" // 🔥 NAYA: Limit
                 className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : ""}`}
               />
             </div>
@@ -203,7 +199,7 @@ const RoutesPage = () => {
         </div>
       )}
 
-      {/* Table Data */}
+      {/* Table Data - Keeping Concise */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <table
           className={`w-full border-collapse min-w-[600px] ${language === "ur" ? "text-right" : "text-left"}`}
@@ -296,7 +292,6 @@ const RoutesPage = () => {
         </table>
       </div>
 
-      {/* 🔥 NAYA: Delete Confirmation Modal With Loader */}
       {deleteModal.show && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
