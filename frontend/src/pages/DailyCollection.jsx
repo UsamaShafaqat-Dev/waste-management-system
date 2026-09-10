@@ -51,8 +51,10 @@ const DailyCollection = () => {
           `/daily-collections/shops/${selectedRoute}`,
         );
 
+        // 🔥 NAYA: Serial Number bhi fetch kar ke add kiya
         const initialEntries = data.map((shop) => ({
           shopId: shop._id,
+          serialNumber: shop.serialNumber,
           shopName: shop.shopName,
           weightKg: "",
         }));
@@ -108,7 +110,6 @@ const DailyCollection = () => {
         date,
         routeId: selectedRoute,
         vehicleId: vehicleInfo._id,
-        // 🔥 NAYA: Automatically treat empty fields as 0
         collections: shopEntries.map((entry) => ({
           shopId: entry.shopId,
           weightKg: parseFloat(entry.weightKg) || 0,
@@ -224,6 +225,11 @@ const DailyCollection = () => {
                   <thead>
                     <tr className="bg-gray-800 text-white text-sm">
                       <th
+                        className={`px-6 py-4 font-medium w-24 ${language === "ur" ? "text-right" : "text-left"}`}
+                      >
+                        {t("Sr. No")}
+                      </th>
+                      <th
                         className={`px-6 py-4 font-medium w-1/2 ${language === "ur" ? "text-right" : "text-left"}`}
                       >
                         {t("Shop Name")}
@@ -241,6 +247,9 @@ const DailyCollection = () => {
                         key={entry.shopId}
                         className="border-b hover:bg-gray-50 transition-colors"
                       >
+                        <td className="px-6 py-4 font-bold text-gray-500">
+                          {entry.serialNumber || index + 1}
+                        </td>
                         <td className="px-6 py-4 font-bold text-gray-800 text-lg">
                           {entry.shopName}
                         </td>
@@ -265,6 +274,7 @@ const DailyCollection = () => {
                   <tfoot>
                     <tr className="bg-green-50 border-t-2 border-green-200">
                       <td
+                        colSpan="2"
                         className={`px-6 py-4 font-bold text-green-800 text-xl ${language === "ur" ? "text-left" : "text-right"}`}
                       >
                         {t("Route Total Weight:")}
@@ -288,8 +298,11 @@ const DailyCollection = () => {
                   >
                     <div className="flex justify-between items-center border-b pb-2">
                       <span
-                        className={`font-bold text-gray-800 text-xl ${language === "ur" ? "text-right w-full" : ""}`}
+                        className={`font-bold text-gray-800 text-xl flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
                       >
+                        <span className="text-gray-400 text-sm font-normal">
+                          #{entry.serialNumber || index + 1}
+                        </span>
                         {entry.shopName}
                       </span>
                     </div>

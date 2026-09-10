@@ -4,16 +4,12 @@ import { useNavigate } from "react-router-dom";
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // Check if user is logged in on app load
+  // 🔥 NAYA LOGIC: State banate waqt hi localStorage se user nikal lo taake refresh par delay na aaye
+  const [user, setUser] = useState(() => {
     const loggedInUser = localStorage.getItem("userInfo");
-    if (loggedInUser) {
-      setUser(JSON.parse(loggedInUser));
-    }
-  }, []);
+    return loggedInUser ? JSON.parse(loggedInUser) : null;
+  });
+  const navigate = useNavigate();
 
   const login = (userData) => {
     localStorage.setItem("userInfo", JSON.stringify(userData));

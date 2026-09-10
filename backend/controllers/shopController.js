@@ -12,15 +12,16 @@ const createShop = async (req, res) => {
       status,
     } = req.body;
 
-    // 🔥 NAYA: Duplicate Serial Number Check on Create
-    if (serialNumber && Number(serialNumber) > 0) {
-      const exists = await Shop.findOne({ serialNumber: Number(serialNumber) });
+    // 🔥 NAYA: Route-Specific Duplicate Check (Ab ek route mein duplicate nahi hoga, par alag route mein ho sakega)
+    if (serialNumber && Number(serialNumber) > 0 && assignedRoute) {
+      const exists = await Shop.findOne({
+        assignedRoute: assignedRoute,
+        serialNumber: Number(serialNumber),
+      });
       if (exists) {
-        return res
-          .status(400)
-          .json({
-            message: `Serial Number ${serialNumber} is already assigned to another shop!`,
-          });
+        return res.status(400).json({
+          message: `Serial Number ${serialNumber} is already assigned to another shop in THIS route!`,
+        });
       }
     }
 
@@ -42,7 +43,6 @@ const createShop = async (req, res) => {
 
 const getShops = async (req, res) => {
   try {
-    // Shops ko Serial Number ke hisab se sort kiya gaya hai
     const shops = await Shop.find()
       .populate("assignedRoute", "routeName")
       .sort({ serialNumber: 1 });
@@ -54,21 +54,27 @@ const getShops = async (req, res) => {
 
 const updateShop = async (req, res) => {
   try {
-    // 🔥 NAYA: Duplicate Serial Number Check on Update
+    // Pehle existing shop nikal lein taake route check kar sakein
+    const existingShop = await Shop.findById(req.params.id);
+    if (!existingShop)
+      return res.status(404).json({ message: "Shop not found" });
+
+    // Agar update mein naya route aaya hai toh wo lein, warna purana hi rakhein
+    const routeToCheck = req.body.assignedRoute || existingShop.assignedRoute;
+
+    // 🔥 NAYA: Route-Specific Duplicate Check on Update
     if (req.body.serialNumber !== undefined) {
       const num = Number(req.body.serialNumber);
-      if (num > 0) {
-        // Check if any OTHER shop has this serial number
+      if (num > 0 && routeToCheck) {
         const exists = await Shop.findOne({
+          assignedRoute: routeToCheck,
           serialNumber: num,
           _id: { $ne: req.params.id },
         });
         if (exists) {
-          return res
-            .status(400)
-            .json({
-              message: `Serial Number ${num} is already assigned to another shop!`,
-            });
+          return res.status(400).json({
+            message: `Serial Number ${num} is already assigned to another shop in THIS route!`,
+          });
         }
       }
     }
@@ -78,9 +84,6 @@ const updateShop = async (req, res) => {
       runValidators: true,
     });
 
-    if (!shop) {
-      return res.status(404).json({ message: "Shop not found" });
-    }
     res.status(200).json(shop);
   } catch (error) {
     res.status(500).json({ message: error.message });
