@@ -12,6 +12,18 @@ const createShop = async (req, res) => {
       status,
     } = req.body;
 
+    // 🔥 NAYA: Duplicate Serial Number Check on Create
+    if (serialNumber && Number(serialNumber) > 0) {
+      const exists = await Shop.findOne({ serialNumber: Number(serialNumber) });
+      if (exists) {
+        return res
+          .status(400)
+          .json({
+            message: `Serial Number ${serialNumber} is already assigned to another shop!`,
+          });
+      }
+    }
+
     const shop = await Shop.create({
       shopName,
       ownerName,
@@ -30,7 +42,7 @@ const createShop = async (req, res) => {
 
 const getShops = async (req, res) => {
   try {
-    // 🔥 Shops ko Serial Number ke hisab se sort kiya gaya hai
+    // Shops ko Serial Number ke hisab se sort kiya gaya hai
     const shops = await Shop.find()
       .populate("assignedRoute", "routeName")
       .sort({ serialNumber: 1 });
@@ -42,6 +54,25 @@ const getShops = async (req, res) => {
 
 const updateShop = async (req, res) => {
   try {
+    // 🔥 NAYA: Duplicate Serial Number Check on Update
+    if (req.body.serialNumber !== undefined) {
+      const num = Number(req.body.serialNumber);
+      if (num > 0) {
+        // Check if any OTHER shop has this serial number
+        const exists = await Shop.findOne({
+          serialNumber: num,
+          _id: { $ne: req.params.id },
+        });
+        if (exists) {
+          return res
+            .status(400)
+            .json({
+              message: `Serial Number ${num} is already assigned to another shop!`,
+            });
+        }
+      }
+    }
+
     const shop = await Shop.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true,

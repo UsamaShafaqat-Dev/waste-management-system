@@ -47,13 +47,20 @@ const Shops = () => {
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  const handleUpdateSerial = async (id, newSerial) => {
+  // 🔥 NAYA LOGIC: Auto-Refresh Rok Diya Taake Row Bhaage Nahi
+  const handleUpdateSerial = async (id, newSerial, originalSerial) => {
+    if (Number(newSerial) === Number(originalSerial)) return; // Agar same hai to API call na ho
+
     try {
       await api.put(`/shops/${id}`, { serialNumber: Number(newSerial) });
       toast.success(t("Serial updated!"));
-      fetchData();
+      // Note: Hum yahan fetchData() call nahi kar rahay taake rows upar neechay na bhagein.
     } catch (error) {
-      toast.error(t("Failed to update serial"));
+      toast.error(
+        error.response?.data?.message || t("Failed to update serial"),
+      );
+      // Agar error aaye (jaise duplicate) tab data wapas theek karne ke liye refetch karein
+      fetchData();
     }
   };
 
@@ -117,6 +124,21 @@ const Shops = () => {
   const filteredShopsList = routeFilter
     ? shopsList.filter((s) => s.assignedRoute?._id === routeFilter)
     : shopsList;
+
+  // 🔥 NAYA: Enter dabane par agle box mein focus karne ka function
+  const handleKeyDown = (e, index) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const nextInput = document.querySelector(
+        `input[data-index='${index + 1}']`,
+      );
+      if (nextInput) {
+        nextInput.focus(); // Focus change hotay hi current input ka onBlur khud trigger ho jayega
+      } else {
+        e.target.blur(); // Agar last item hai toh bas focus khatam kar do
+      }
+    }
+  };
 
   return (
     <div
@@ -329,7 +351,7 @@ const Shops = () => {
                   </td>
                 </tr>
               ) : (
-                filteredShopsList.map((shop) => (
+                filteredShopsList.map((shop, index) => (
                   <tr
                     key={shop._id}
                     className="border-b hover:bg-gray-50 text-sm transition-colors"
@@ -340,11 +362,17 @@ const Shops = () => {
                       <input
                         type="number"
                         defaultValue={shop.serialNumber}
+                        data-index={index}
                         onBlur={(e) =>
-                          handleUpdateSerial(shop._id, e.target.value)
+                          handleUpdateSerial(
+                            shop._id,
+                            e.target.value,
+                            shop.serialNumber,
+                          )
                         }
-                        className="w-14 border border-gray-300 rounded px-2 py-1 text-center outline-none focus:border-green-500"
-                        title="Click to edit and click outside to save"
+                        onKeyDown={(e) => handleKeyDown(e, index)}
+                        className="w-14 border border-gray-300 rounded px-2 py-1 text-center outline-none focus:border-green-500 focus:bg-green-50"
+                        title="Press Enter to save and move down"
                       />
                     </td>
                     <td
@@ -412,7 +440,7 @@ const Shops = () => {
               {t("No shops found.")}
             </div>
           ) : (
-            filteredShopsList.map((shop) => (
+            filteredShopsList.map((shop, index) => (
               <div
                 key={shop._id}
                 className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col gap-3"
@@ -424,10 +452,16 @@ const Shops = () => {
                     <input
                       type="number"
                       defaultValue={shop.serialNumber}
+                      data-index={index}
                       onBlur={(e) =>
-                        handleUpdateSerial(shop._id, e.target.value)
+                        handleUpdateSerial(
+                          shop._id,
+                          e.target.value,
+                          shop.serialNumber,
+                        )
                       }
-                      className="w-12 border border-gray-300 rounded px-1 py-1 text-center outline-none text-xs font-bold"
+                      onKeyDown={(e) => handleKeyDown(e, index)}
+                      className="w-12 border border-gray-300 rounded px-1 py-1 text-center outline-none text-xs font-bold focus:border-green-500 focus:bg-green-50"
                     />
                     <h3
                       className={`font-bold text-lg text-gray-800 ${language === "ur" ? "text-right" : "text-left"}`}
