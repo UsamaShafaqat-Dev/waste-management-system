@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useContext } from "react";
-import { Truck, Plus, Trash2, Edit, AlertTriangle } from "lucide-react";
+import {
+  Truck,
+  Plus,
+  Trash2,
+  Edit,
+  AlertTriangle,
+  Loader2,
+} from "lucide-react"; // 🔥 NAYA: Loader2 import kiya
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
@@ -14,6 +21,9 @@ const Vehicles = () => {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
+
+  // 🔥 NAYA: Delete loading state
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     vehicleNumber: "",
@@ -45,10 +55,10 @@ const Vehicles = () => {
     try {
       if (editId) {
         await api.put(`/vehicles/${editId}`, formData);
-        toast.success("Vehicle updated successfully!");
+        toast.success(t("Vehicle updated successfully!"));
       } else {
         await api.post("/vehicles", formData);
-        toast.success("Vehicle added successfully!");
+        toast.success(t("Vehicle added successfully!"));
       }
       setFormData({
         vehicleNumber: "",
@@ -61,7 +71,7 @@ const Vehicles = () => {
       setShowForm(false);
       fetchVehicles();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Error saving vehicle");
+      toast.error(error.response?.data?.message || t("Error saving vehicle"));
     } finally {
       setLoading(false);
     }
@@ -80,15 +90,18 @@ const Vehicles = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // 🔥 NAYA: Delete function update (Spinner logic added)
   const executeDelete = async () => {
+    setIsDeleting(true); // Button disable & spinner ON
     try {
       await api.delete(`/vehicles/${deleteModal.id}`);
-      toast.success("Vehicle deleted successfully!");
+      toast.success(t("Vehicle deleted successfully!"));
       fetchVehicles();
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Error deleting");
-    } finally {
       setDeleteModal({ show: false, id: null });
+    } catch (error) {
+      toast.error(error.response?.data?.message || t("Error deleting"));
+    } finally {
+      setIsDeleting(false); // Spinner OFF
     }
   };
 
@@ -181,7 +194,7 @@ const Vehicles = () => {
                 onChange={handleChange}
                 required
                 className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
-                placeholder="Driver Name"
+                placeholder={t("Driver")}
               />
             </div>
             <div>
@@ -221,13 +234,18 @@ const Vehicles = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors"
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors flex items-center gap-2"
               >
-                {loading
-                  ? t("Saving...")
-                  : editId
-                    ? t("Update Vehicle")
-                    : t("Save Vehicle")}
+                {loading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />{" "}
+                    {t("Saving...")}
+                  </>
+                ) : editId ? (
+                  t("Update Vehicle")
+                ) : (
+                  t("Save Vehicle")
+                )}
               </button>
             </div>
           </form>
@@ -241,7 +259,6 @@ const Vehicles = () => {
           >
             <thead>
               <tr className="bg-gray-50 border-b text-gray-600 text-sm">
-                {/* 🔥 NAYA: Simple Sr. No */}
                 <th
                   className={`px-4 py-3 font-medium w-16 ${language === "ur" ? "text-right" : "text-left"}`}
                 >
@@ -292,7 +309,6 @@ const Vehicles = () => {
                   key={vehicle._id}
                   className="border-b hover:bg-gray-50 text-sm"
                 >
-                  {/* 🔥 NAYA: Auto Counting (index + 1) */}
                   <td className="px-4 py-3 font-bold text-gray-500">
                     {index + 1}
                   </td>
@@ -363,7 +379,7 @@ const Vehicles = () => {
               </h3>
               <p className="text-gray-500 text-sm mb-6">
                 {t(
-                  "Are you sure you want to delete this shop? This action cannot be undone.",
+                  "Are you sure you want to delete this vehicle? This action cannot be undone.",
                 )}
               </p>
               <div
@@ -371,15 +387,25 @@ const Vehicles = () => {
               >
                 <button
                   onClick={() => setDeleteModal({ show: false, id: null })}
-                  className="flex-1 px-4 py-2 bg-gray-100 rounded-xl hover:bg-gray-200"
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 bg-gray-100 rounded-xl hover:bg-gray-200 disabled:opacity-50"
                 >
                   {t("Cancel")}
                 </button>
+                {/* 🔥 NAYA: Button with Loading Spinner */}
                 <button
                   onClick={executeDelete}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700"
+                  disabled={isDeleting}
+                  className={`flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 flex justify-center items-center gap-2 ${isDeleting ? "opacity-70 cursor-not-allowed" : ""}`}
                 >
-                  {t("Yes, Delete")}
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="animate-spin" size={18} />
+                      {t("Deleting...")}
+                    </>
+                  ) : (
+                    t("Yes, Delete")
+                  )}
                 </button>
               </div>
             </div>
