@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { Calculator, Calendar, Map, Save, CheckCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
@@ -16,6 +16,9 @@ const MonthlyRate = () => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [bulkRate, setBulkRate] = useState("");
+
+  // 🔥 NAYA: Inputs ko track karne ke liye Ref
+  const inputRefs = useRef([]);
 
   useEffect(() => {
     const fetchRoutes = async () => {
@@ -41,6 +44,8 @@ const MonthlyRate = () => {
           `/monthly-rates?month=${filterMonth}&routeId=${selectedRoute}`,
         );
         setShopRates(data);
+        // Naya data aane par refs array ko reset kar dein
+        inputRefs.current = new Array(data.length).fill(null);
       } catch (error) {
         toast.error("Failed to load shop data");
       } finally {
@@ -54,6 +59,17 @@ const MonthlyRate = () => {
     const updatedRates = [...shopRates];
     updatedRates[index].rate = value;
     setShopRates(updatedRates);
+  };
+
+  // 🔥 NAYA: Enter key press karne par next input par focus karne ka logic
+  const handleKeyDown = (e, index) => {
+    if (e.key === "Enter") {
+      e.preventDefault(); // Form submit ya page scroll hone se rokne ke liye
+      const nextInput = inputRefs.current[index + 1];
+      if (nextInput) {
+        nextInput.focus();
+      }
+    }
   };
 
   const handleApplyToAll = () => {
@@ -232,6 +248,9 @@ const MonthlyRate = () => {
                           min="0"
                           step="any"
                           value={shop.rate}
+                          // 🔥 NAYA: Ref aur KeyDown yahan attach kar diye
+                          ref={(el) => (inputRefs.current[index] = el)}
+                          onKeyDown={(e) => handleKeyDown(e, index)}
                           onChange={(e) =>
                             handleRateChange(index, e.target.value)
                           }
