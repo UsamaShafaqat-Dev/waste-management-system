@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
-import { Map, Plus, Trash2, Edit, AlertTriangle } from "lucide-react";
+import { Map, Plus, Trash2, Edit, AlertTriangle, Loader2 } from "lucide-react"; // 🔥 NAYA: Loader2 import
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
@@ -15,6 +15,9 @@ const RoutesPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
+
+  // 🔥 NAYA: Delete Spinner State
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     routeName: "",
@@ -75,15 +78,18 @@ const RoutesPage = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // 🔥 NAYA: Execute Delete with Loading Spinner
   const executeDelete = async () => {
+    setIsDeleting(true);
     try {
       await api.delete(`/routes/${deleteModal.id}`);
       toast.success("Deleted successfully!");
       fetchData();
+      setDeleteModal({ show: false, id: null });
     } catch (error) {
       toast.error("Error deleting");
     } finally {
-      setDeleteModal({ show: false, id: null });
+      setIsDeleting(false);
     }
   };
 
@@ -181,9 +187,16 @@ const RoutesPage = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg"
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"
               >
-                {loading ? t("Saving...") : t("Save")}
+                {loading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />{" "}
+                    {t("Saving...")}
+                  </>
+                ) : (
+                  t("Save")
+                )}
               </button>
             </div>
           </form>
@@ -197,7 +210,6 @@ const RoutesPage = () => {
         >
           <thead>
             <tr className="bg-gray-50 border-b text-gray-600 text-sm">
-              {/* 🔥 NAYA: Simple Sr. No */}
               <th
                 className={`px-4 py-3 font-medium w-16 ${language === "ur" ? "text-right" : "text-left"}`}
               >
@@ -235,7 +247,6 @@ const RoutesPage = () => {
           <tbody>
             {routesList.map((route, index) => (
               <tr key={route._id} className="border-b hover:bg-gray-50 text-sm">
-                {/* 🔥 NAYA: Auto Counting (index + 1) */}
                 <td className="px-4 py-3 font-bold text-gray-500">
                   {index + 1}
                 </td>
@@ -265,7 +276,7 @@ const RoutesPage = () => {
                   >
                     <button
                       onClick={() => handleEdit(route)}
-                      className={`p-1 text-blue-600 ${language === "ur" ? "ml-2" : "mr-2"}`}
+                      className={`p-1 text-blue-600 hover:bg-blue-50 rounded ${language === "ur" ? "ml-2" : "mr-2"}`}
                     >
                       <Edit size={16} />
                     </button>
@@ -273,7 +284,7 @@ const RoutesPage = () => {
                       onClick={() =>
                         setDeleteModal({ show: true, id: route._id })
                       }
-                      className="p-1 text-red-600"
+                      className="p-1 text-red-600 hover:bg-red-50 rounded"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -285,26 +296,45 @@ const RoutesPage = () => {
         </table>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* 🔥 NAYA: Delete Confirmation Modal With Loader */}
       {deleteModal.show && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
-            <div className="text-center">
-              <h3 className="text-xl font-bold mb-4">{t("Delete Route?")}</h3>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <div className="flex flex-col items-center text-center">
+              <div className="bg-red-100 p-4 rounded-full text-red-600 mb-4">
+                <AlertTriangle size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">
+                {t("Delete Route?")}
+              </h3>
+              <p className="text-gray-500 text-sm mb-6">
+                {t(
+                  "Are you sure you want to delete this route? This action cannot be undone.",
+                )}
+              </p>
               <div
-                className={`flex gap-3 w-full ${language === "ur" ? "flex-row-reverse" : ""}`}
+                className={`flex gap-3 w-full mt-4 ${language === "ur" ? "flex-row-reverse" : ""}`}
               >
                 <button
-                  onClick={() => setDeleteModal({ show: false })}
-                  className="flex-1 py-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+                  onClick={() => setDeleteModal({ show: false, id: null })}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
                 >
                   {t("Cancel")}
                 </button>
                 <button
                   onClick={executeDelete}
-                  className="flex-1 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
+                  disabled={isDeleting}
+                  className={`flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors flex justify-center items-center gap-2 ${isDeleting ? "opacity-70 cursor-not-allowed" : ""}`}
                 >
-                  {t("Delete")}
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="animate-spin" size={18} />
+                      {t("Deleting...")}
+                    </>
+                  ) : (
+                    t("Delete")
+                  )}
                 </button>
               </div>
             </div>

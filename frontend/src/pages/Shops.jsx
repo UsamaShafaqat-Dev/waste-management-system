@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useContext } from "react";
-import { Store, Plus, Trash2, Edit, AlertTriangle, Filter } from "lucide-react";
+import {
+  Store,
+  Plus,
+  Trash2,
+  Edit,
+  AlertTriangle,
+  Filter,
+  Loader2,
+} from "lucide-react"; // 🔥 NAYA: Loader import
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
@@ -16,6 +24,9 @@ const Shops = () => {
   const [editId, setEditId] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
   const [routeFilter, setRouteFilter] = useState("");
+
+  // 🔥 NAYA: Delete Loading State
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     shopName: "",
@@ -47,19 +58,16 @@ const Shops = () => {
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  // 🔥 NAYA LOGIC: Auto-Refresh Rok Diya Taake Row Bhaage Nahi
   const handleUpdateSerial = async (id, newSerial, originalSerial) => {
-    if (Number(newSerial) === Number(originalSerial)) return; // Agar same hai to API call na ho
+    if (Number(newSerial) === Number(originalSerial)) return;
 
     try {
       await api.put(`/shops/${id}`, { serialNumber: Number(newSerial) });
       toast.success(t("Serial updated!"));
-      // Note: Hum yahan fetchData() call nahi kar rahay taake rows upar neechay na bhagein.
     } catch (error) {
       toast.error(
         error.response?.data?.message || t("Failed to update serial"),
       );
-      // Agar error aaye (jaise duplicate) tab data wapas theek karne ke liye refetch karein
       fetchData();
     }
   };
@@ -109,15 +117,18 @@ const Shops = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // 🔥 NAYA: Delete Logic with Spinner
   const executeDelete = async () => {
+    setIsDeleting(true);
     try {
       await api.delete(`/shops/${deleteModal.id}`);
       toast.success(t("Deleted successfully!"));
       fetchData();
+      setDeleteModal({ show: false, id: null });
     } catch (error) {
       toast.error(t("Error deleting"));
     } finally {
-      setDeleteModal({ show: false, id: null });
+      setIsDeleting(false);
     }
   };
 
@@ -125,7 +136,6 @@ const Shops = () => {
     ? shopsList.filter((s) => s.assignedRoute?._id === routeFilter)
     : shopsList;
 
-  // 🔥 NAYA: Enter dabane par agle box mein focus karne ka function
   const handleKeyDown = (e, index) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -133,9 +143,9 @@ const Shops = () => {
         `input[data-index='${index + 1}']`,
       );
       if (nextInput) {
-        nextInput.focus(); // Focus change hotay hi current input ka onBlur khud trigger ho jayega
+        nextInput.focus();
       } else {
-        e.target.blur(); // Agar last item hai toh bas focus khatam kar do
+        e.target.blur();
       }
     }
   };
@@ -290,9 +300,16 @@ const Shops = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className={`w-full md:w-auto px-6 py-2.5 rounded-lg text-white font-medium ${loading ? "bg-green-400" : "bg-green-600 hover:bg-green-700"}`}
+                className={`w-full md:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-white font-medium ${loading ? "bg-green-400" : "bg-green-600 hover:bg-green-700"}`}
               >
-                {loading ? t("Saving...") : t("Save Shop")}
+                {loading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />{" "}
+                    {t("Saving...")}
+                  </>
+                ) : (
+                  t("Save Shop")
+                )}
               </button>
             </div>
           </form>
@@ -551,15 +568,25 @@ const Shops = () => {
               >
                 <button
                   onClick={() => setDeleteModal({ show: false })}
-                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors"
+                  disabled={isDeleting}
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
                 >
                   {t("Cancel")}
                 </button>
+                {/* 🔥 NAYA: Button with Loading Spinner */}
                 <button
                   onClick={executeDelete}
-                  className="flex-1 py-2.5 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 transition-colors shadow-sm"
+                  disabled={isDeleting}
+                  className={`flex-1 py-2.5 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 transition-colors shadow-sm flex justify-center items-center gap-2 ${isDeleting ? "opacity-70 cursor-not-allowed" : ""}`}
                 >
-                  {t("Yes, Delete")}
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="animate-spin" size={18} />
+                      {t("Deleting...") || "Deleting..."}
+                    </>
+                  ) : (
+                    t("Yes, Delete")
+                  )}
                 </button>
               </div>
             </div>

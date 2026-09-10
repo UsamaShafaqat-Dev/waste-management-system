@@ -7,19 +7,23 @@ import {
   Trash2,
   Edit,
   AlertTriangle,
+  Loader2, // 🔥 NAYA: Loader icon import kiya
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
-import { LanguageContext } from "../context/LanguageContext"; // Hook Add Kiya
+import { LanguageContext } from "../context/LanguageContext";
 
 const Users = () => {
-  const { t, language } = useContext(LanguageContext); // Translation Nikali
+  const { t, language } = useContext(LanguageContext);
   const [usersList, setUsersList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
   const [editId, setEditId] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
+
+  // 🔥 NAYA: Delete Loading State
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -89,15 +93,18 @@ const Users = () => {
     setDeleteModal({ show: true, id });
   };
 
+  // 🔥 NAYA: Spinner ke sath Delete Logic
   const executeDelete = async () => {
+    setIsDeleting(true);
     try {
       await api.delete(`/users/${deleteModal.id}`);
       toast.success("User deleted successfully!");
       fetchUsers();
+      setDeleteModal({ show: false, id: null });
     } catch (error) {
       toast.error(error.response?.data?.message || "Error deleting user");
     } finally {
-      setDeleteModal({ show: false, id: null });
+      setIsDeleting(false);
     }
   };
 
@@ -218,13 +225,18 @@ const Users = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-2 rounded-lg transition-colors"
+                className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-2 rounded-lg transition-colors flex items-center gap-2"
               >
-                {loading
-                  ? t("Saving...")
-                  : editId
-                    ? t("Update Account")
-                    : t("Create Account")}
+                {loading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />{" "}
+                    {t("Saving...")}
+                  </>
+                ) : editId ? (
+                  t("Update Account")
+                ) : (
+                  t("Create Account")
+                )}
               </button>
             </div>
           </form>
@@ -320,7 +332,7 @@ const Users = () => {
       </div>
 
       {deleteModal.show && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl transform transition-all">
             <div className="flex flex-col items-center text-center">
               <div className="bg-red-100 p-4 rounded-full text-red-600 mb-4">
@@ -339,15 +351,25 @@ const Users = () => {
               >
                 <button
                   onClick={() => setDeleteModal({ show: false, id: null })}
-                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors"
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
                 >
                   {t("Cancel")}
                 </button>
+                {/* 🔥 NAYA: Button with Loading Spinner */}
                 <button
                   onClick={executeDelete}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 transition-colors"
+                  disabled={isDeleting}
+                  className={`flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 transition-colors flex justify-center items-center gap-2 ${isDeleting ? "opacity-70 cursor-not-allowed" : ""}`}
                 >
-                  {t("Yes, Delete")}
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="animate-spin" size={18} />
+                      {t("Deleting...") || "Deleting..."}
+                    </>
+                  ) : (
+                    t("Yes, Delete")
+                  )}
                 </button>
               </div>
             </div>
