@@ -25,13 +25,14 @@ const dailyCollectionSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    // 🔥 Puraane Rate aur Amount ko 'required' se hata diya
     ratePerKg: {
       type: Number,
-      required: true,
+      default: 0,
     },
     amount: {
       type: Number,
-      required: true,
+      default: 0,
     },
     status: {
       type: String,

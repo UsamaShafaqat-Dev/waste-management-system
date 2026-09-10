@@ -6,7 +6,6 @@ const Shop = require("../models/Shop");
 const createDailyCollection = async (req, res) => {
   try {
     const { date, routeId, vehicleId, collections } = req.body;
-    // collections will be an array of objects: [{ shopId, weightKg, ratePerKg, amount }]
 
     // Set time to start of the day for consistent checking
     const collectionDate = new Date(date);
@@ -21,23 +20,20 @@ const createDailyCollection = async (req, res) => {
     });
 
     if (existingEntry) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Collection for this Route on this Date is already submitted!",
-        });
+      return res.status(400).json({
+        message: "Collection for this Route on this Date is already submitted!",
+      });
     }
 
-    // Format data for database insertion
+    // 🔥 NAYA: Format data securely
     const formattedData = collections.map((item) => ({
       date: collectionDate,
       route: routeId,
       vehicle: vehicleId,
       shop: item.shopId,
-      weightKg: item.weightKg,
-      ratePerKg: item.ratePerKg,
-      amount: item.amount,
+      weightKg: item.weightKg || 0, // Agar undefined ho toh 0
+      ratePerKg: 0, // Obsolete field
+      amount: 0, // Obsolete field
     }));
 
     // Bulk save all shop records at once
@@ -47,12 +43,10 @@ const createDailyCollection = async (req, res) => {
   } catch (error) {
     // Catch MongoDB duplicate key error (Double Entry Fallback)
     if (error.code === 11000) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Double Entry Detected: A shop in this route already has data for this date.",
-        });
+      return res.status(400).json({
+        message:
+          "Double Entry Detected: A shop in this route already has data for this date.",
+      });
     }
     res.status(500).json({ message: error.message });
   }

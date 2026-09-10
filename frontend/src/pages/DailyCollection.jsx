@@ -51,7 +51,6 @@ const DailyCollection = () => {
           `/daily-collections/shops/${selectedRoute}`,
         );
 
-        // 🔥 Rate aur Mann khatam, Sirf Weight (KG) bacha hai
         const initialEntries = data.map((shop) => ({
           shopId: shop._id,
           shopName: shop.shopName,
@@ -103,24 +102,16 @@ const DailyCollection = () => {
     if (shopEntries.length === 0)
       return toast.error(t("No shops found in this route"));
 
-    const hasInvalidWeights = shopEntries.some(
-      (item) => item.weightKg === "" || parseFloat(item.weightKg) < 0,
-    );
-    if (hasInvalidWeights) {
-      return toast.error(
-        "Please enter a valid weight (0 or more) for all shops",
-      );
-    }
-
     setLoading(true);
     try {
       const payload = {
         date,
         routeId: selectedRoute,
         vehicleId: vehicleInfo._id,
+        // 🔥 NAYA: Automatically treat empty fields as 0
         collections: shopEntries.map((entry) => ({
           shopId: entry.shopId,
-          weightKg: parseFloat(entry.weightKg),
+          weightKg: parseFloat(entry.weightKg) || 0,
         })),
       };
 
