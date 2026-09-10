@@ -2,10 +2,10 @@ import React, { useState, useEffect, useContext } from "react";
 import { Book, Calendar, Map, Search, FileText, Printer } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
-import { LanguageContext } from "../context/LanguageContext"; // Hook Import Kiya
+import { LanguageContext } from "../context/LanguageContext";
 
 const RouteLedger = () => {
-  const { t, language } = useContext(LanguageContext); // Translation Nikali
+  const { t, language } = useContext(LanguageContext);
 
   const [routes, setRoutes] = useState([]);
 
@@ -268,10 +268,11 @@ const RouteLedger = () => {
                         <td className="px-4 py-3 font-medium text-gray-800">
                           {shop.shopName}
                         </td>
+                        {/* 🔥 NAYA: Rate ki Safe Handling */}
                         <td
                           className={`px-4 py-3 text-gray-500 print:text-black ${language === "ur" ? "text-left" : "text-right"}`}
                         >
-                          Rs. {shop.rate}
+                          Rs. {(shop.rate || 0).toLocaleString()}
                         </td>
                         <td
                           className={`px-4 py-3 font-semibold ${language === "ur" ? "text-left" : "text-right"}`}
