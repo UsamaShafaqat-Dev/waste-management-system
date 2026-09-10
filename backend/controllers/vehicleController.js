@@ -64,7 +64,6 @@ const updateVehicle = async (req, res) => {
 // @route   DELETE /api/vehicles/:id
 const deleteVehicle = async (req, res) => {
   try {
-    // Note: In a real large-scale app, you might want to check if the vehicle is assigned to a route before deleting.
     const vehicle = await Vehicle.findByIdAndDelete(req.params.id);
 
     if (!vehicle) {

@@ -3,7 +3,7 @@ import { Truck, Plus, Trash2, Edit, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
-import { LanguageContext } from "../context/LanguageContext"; // Translation Hook
+import { LanguageContext } from "../context/LanguageContext";
 
 const Vehicles = () => {
   const { user } = useContext(AuthContext);
@@ -241,6 +241,12 @@ const Vehicles = () => {
           >
             <thead>
               <tr className="bg-gray-50 border-b text-gray-600 text-sm">
+                {/* 🔥 NAYA: Simple Sr. No */}
+                <th
+                  className={`px-4 py-3 font-medium w-16 ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  {t("Sr. No")}
+                </th>
                 <th
                   className={`px-4 py-3 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
                 >
@@ -281,11 +287,15 @@ const Vehicles = () => {
               </tr>
             </thead>
             <tbody>
-              {vehiclesList.map((vehicle) => (
+              {vehiclesList.map((vehicle, index) => (
                 <tr
                   key={vehicle._id}
                   className="border-b hover:bg-gray-50 text-sm"
                 >
+                  {/* 🔥 NAYA: Auto Counting (index + 1) */}
+                  <td className="px-4 py-3 font-bold text-gray-500">
+                    {index + 1}
+                  </td>
                   <td className="px-4 py-3 font-medium text-gray-800">
                     {vehicle.vehicleNumber}
                   </td>

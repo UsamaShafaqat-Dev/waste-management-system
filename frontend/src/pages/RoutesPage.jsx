@@ -3,11 +3,11 @@ import { Map, Plus, Trash2, Edit, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
-import { LanguageContext } from "../context/LanguageContext"; // Translation Hook Add Kiya
+import { LanguageContext } from "../context/LanguageContext";
 
 const RoutesPage = () => {
   const { user } = useContext(AuthContext);
-  const { t, language } = useContext(LanguageContext); // Dictionary nikal li
+  const { t, language } = useContext(LanguageContext);
 
   const [routesList, setRoutesList] = useState([]);
   const [vehicles, setVehicles] = useState([]);
@@ -197,29 +197,35 @@ const RoutesPage = () => {
         >
           <thead>
             <tr className="bg-gray-50 border-b text-gray-600 text-sm">
+              {/* 🔥 NAYA: Simple Sr. No */}
               <th
-                className={`px-4 py-3 ${language === "ur" ? "text-right" : "text-left"}`}
+                className={`px-4 py-3 font-medium w-16 ${language === "ur" ? "text-right" : "text-left"}`}
+              >
+                {t("Sr. No")}
+              </th>
+              <th
+                className={`px-4 py-3 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
               >
                 {t("Route Name")}
               </th>
               <th
-                className={`px-4 py-3 ${language === "ur" ? "text-right" : "text-left"}`}
+                className={`px-4 py-3 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
               >
                 {t("Vehicle")}
               </th>
               <th
-                className={`px-4 py-3 ${language === "ur" ? "text-right" : "text-left"}`}
+                className={`px-4 py-3 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
               >
                 {t("Driver")}
               </th>
               <th
-                className={`px-4 py-3 ${language === "ur" ? "text-right" : "text-left"}`}
+                className={`px-4 py-3 font-medium ${language === "ur" ? "text-right" : "text-left"}`}
               >
                 {t("Status")}
               </th>
               {user?.role === "Admin" && (
                 <th
-                  className={`px-4 py-3 ${language === "ur" ? "text-left" : "text-right"}`}
+                  className={`px-4 py-3 font-medium ${language === "ur" ? "text-left" : "text-right"}`}
                 >
                   {t("Actions")}
                 </th>
@@ -227,15 +233,21 @@ const RoutesPage = () => {
             </tr>
           </thead>
           <tbody>
-            {routesList.map((route) => (
+            {routesList.map((route, index) => (
               <tr key={route._id} className="border-b hover:bg-gray-50 text-sm">
-                <td className="px-4 py-3">{route.routeName}</td>
+                {/* 🔥 NAYA: Auto Counting (index + 1) */}
+                <td className="px-4 py-3 font-bold text-gray-500">
+                  {index + 1}
+                </td>
+                <td className="px-4 py-3 font-medium text-gray-800">
+                  {route.routeName}
+                </td>
                 <td className="px-4 py-3 font-medium text-purple-600">
                   {route.assignedVehicle
                     ? route.assignedVehicle.vehicleNumber
                     : t("Not Assigned")}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 text-gray-600">
                   {route.assignedVehicle
                     ? route.assignedVehicle.driverName
                     : "-"}
