@@ -24,7 +24,6 @@ const Shops = () => {
   const [editId, setEditId] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
 
-  // 🔥 NAYA: Status filter (Default "Active" rakha hai taake Inactive dukaanein chup jayen)
   const [routeFilter, setRouteFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("Active");
 
@@ -107,21 +106,25 @@ const Shops = () => {
     }, 100);
   };
 
+  // 🔥 NAYA: VIP Delete Logic jo kabhi stuck nahi hogi
   const executeDelete = async () => {
     setIsDeleting(true);
     try {
       await api.delete(`/shops/${deleteModal.id}`);
       toast.success(t("Deleted successfully!"));
       fetchData();
-      setDeleteModal({ show: false, id: null });
     } catch (error) {
-      toast.error(t("Error deleting"));
+      // Asli error message dikhayega (e.g., "Cannot delete shop with existing ledger")
+      const errorMsg =
+        error.response?.data?.message || t("Error deleting shop.");
+      toast.error(errorMsg, { duration: 4000 });
     } finally {
       setIsDeleting(false);
+      // 🔥 Error aaye ya na aaye, modal zaroor band ho jayega taake screen atak na jaye
+      setDeleteModal({ show: false, id: null });
     }
   };
 
-  // 🔥 NAYA: Route aur Status dono ko dekh kar list banayega
   const filteredShopsList = shopsList.filter((s) => {
     const matchRoute = routeFilter
       ? s.assignedRoute?._id === routeFilter
@@ -150,7 +153,6 @@ const Shops = () => {
         <div
           className={`flex flex-wrap items-center gap-3 w-full lg:w-auto ${language === "ur" ? "flex-row-reverse" : ""}`}
         >
-          {/* Status Filter */}
           <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg flex-1 md:flex-none">
             <Filter size={16} className="text-purple-500" />
             <select
@@ -164,7 +166,6 @@ const Shops = () => {
             </select>
           </div>
 
-          {/* Route Filter */}
           <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg flex-1 md:flex-none">
             <Filter size={16} className="text-gray-500" />
             <select
