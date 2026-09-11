@@ -51,8 +51,11 @@ const DailyCollection = () => {
           `/daily-collections/shops/${selectedRoute}`,
         );
 
-        // 🔥 NAYA: Serial Number bhi fetch kar ke add kiya
-        const initialEntries = data.map((shop) => ({
+        // 🔥 VIP JADOO: Sirf Active shops ko filter karein
+        // Jo Inactive dukaanein hain wo ab yahan show nahi hongi!
+        const activeShops = data.filter((shop) => shop.status === "Active");
+
+        const initialEntries = activeShops.map((shop) => ({
           shopId: shop._id,
           serialNumber: shop.serialNumber,
           shopName: shop.shopName,
@@ -211,7 +214,7 @@ const DailyCollection = () => {
               <AlertCircle size={32} />
               <p>
                 {t(
-                  "No shops are assigned to this route. Please add shops first.",
+                  "No active shops are assigned to this route. Please add active shops first.",
                 )}
               </p>
             </div>
@@ -227,7 +230,7 @@ const DailyCollection = () => {
                       <th
                         className={`px-6 py-4 font-medium w-24 ${language === "ur" ? "text-right" : "text-left"}`}
                       >
-                        {t("Sr. No")}
+                        {t("Account No")}
                       </th>
                       <th
                         className={`px-6 py-4 font-medium w-1/2 ${language === "ur" ? "text-right" : "text-left"}`}
@@ -247,8 +250,8 @@ const DailyCollection = () => {
                         key={entry.shopId}
                         className="border-b hover:bg-gray-50 transition-colors"
                       >
-                        <td className="px-6 py-4 font-bold text-gray-500">
-                          {entry.serialNumber || index + 1}
+                        <td className="px-6 py-4 font-black text-indigo-700 text-lg">
+                          #{entry.serialNumber}
                         </td>
                         <td className="px-6 py-4 font-bold text-gray-800 text-lg">
                           {entry.shopName}
@@ -300,8 +303,8 @@ const DailyCollection = () => {
                       <span
                         className={`font-bold text-gray-800 text-xl flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
                       >
-                        <span className="text-gray-400 text-sm font-normal">
-                          #{entry.serialNumber || index + 1}
+                        <span className="bg-indigo-100 text-indigo-800 font-black px-2 py-1 rounded text-sm">
+                          #{entry.serialNumber}
                         </span>
                         {entry.shopName}
                       </span>
