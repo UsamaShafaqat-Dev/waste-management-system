@@ -13,7 +13,7 @@ const createDailyCollection = async (req, res) => {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Double Entry Check: Check if collection already exists for this route on this date
+    // Double Entry Check
     const existingEntry = await DailyCollection.findOne({
       route: routeId,
       date: { $gte: collectionDate, $lte: endOfDay },
@@ -25,23 +25,20 @@ const createDailyCollection = async (req, res) => {
       });
     }
 
-    // 🔥 NAYA: Format data securely
     const formattedData = collections.map((item) => ({
       date: collectionDate,
       route: routeId,
       vehicle: vehicleId,
       shop: item.shopId,
-      weightKg: item.weightKg || 0, // Agar undefined ho toh 0
-      ratePerKg: 0, // Obsolete field
-      amount: 0, // Obsolete field
+      weightKg: item.weightKg || 0,
+      ratePerKg: 0,
+      amount: 0,
     }));
 
-    // Bulk save all shop records at once
     await DailyCollection.insertMany(formattedData);
 
     res.status(201).json({ message: "Daily Collection Saved Successfully!" });
   } catch (error) {
-    // Catch MongoDB duplicate key error (Double Entry Fallback)
     if (error.code === 11000) {
       return res.status(400).json({
         message:
@@ -66,4 +63,34 @@ const getShopsByRoute = async (req, res) => {
   }
 };
 
-module.exports = { createDailyCollection, getShopsByRoute };
+// 🔥 NAYA: Ghalti theek karne wala (Update Weight) API
+// @desc    Update a specific daily collection weight
+// @route   PUT /api/daily-collections/:id
+const updateCollectionWeight = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { weightKg } = req.body;
+
+    const collection = await DailyCollection.findByIdAndUpdate(
+      id,
+      { weightKg: parseFloat(weightKg) || 0 },
+      { new: true },
+    );
+
+    if (!collection) {
+      return res.status(404).json({ message: "Collection record not found" });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Weight updated successfully", collection });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = {
+  createDailyCollection,
+  getShopsByRoute,
+  updateCollectionWeight,
+};

@@ -19,7 +19,7 @@ import toast from "react-hot-toast";
 import api from "../services/api";
 import { AuthContext } from "../context/AuthContext";
 import { LanguageContext } from "../context/LanguageContext";
-import * as XLSX from "xlsx"; // 🔥 NAYA: Excel Export ke liye
+import * as XLSX from "xlsx";
 
 const ShopLedger = () => {
   const { user } = useContext(AuthContext);
@@ -46,6 +46,14 @@ const ShopLedger = () => {
   const [loading, setLoading] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [editPaymentId, setEditPaymentId] = useState(null);
+
+  // 🔥 NAYA: Weight Edit Modal State
+  const [showWeightModal, setShowWeightModal] = useState(false);
+  const [editWeightData, setEditWeightData] = useState({
+    id: null,
+    weightKg: "",
+    date: "",
+  });
 
   const [viewMode, setViewMode] = useState("ledger");
 
@@ -201,7 +209,35 @@ const ShopLedger = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // 🔥 NAYA: Advanced 1-31 Register Generator (Daily Balance ke sath)
+  // 🔥 NAYA: Weight Edit Handlers
+  const handleEditWeightClick = (collectionRow) => {
+    setEditWeightData({
+      id: collectionRow._id,
+      weightKg: collectionRow.weightKg,
+      date: new Date(collectionRow.date).toLocaleDateString(
+        language === "ur" ? "ur-PK" : "en-US",
+      ),
+    });
+    setShowWeightModal(true);
+  };
+
+  const handleWeightUpdateSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.put(`/daily-collections/${editWeightData.id}`, {
+        weightKg: editWeightData.weightKg,
+      });
+      toast.success(t("Weight updated successfully!"));
+      setShowWeightModal(false);
+      fetchLedger(); // 🔥 Jadoo: Yahan ledger wapis fetch hoga toh sara 1-31 ka hisab theek ho jayega
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Error updating weight");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const generateDailyRegister = () => {
     if (!ledgerData || !selectedMonth) return null;
 
@@ -217,7 +253,6 @@ const ShopLedger = () => {
     let currentBalance = openingBalance;
 
     for (let day = 1; day <= daysInMonth; day++) {
-      // 1. Collections for the day
       const dailyColls = collections.filter((c) => {
         const cDate = new Date(c.date);
         return (
@@ -225,7 +260,6 @@ const ShopLedger = () => {
         );
       });
 
-      // 2. Payments for the day
       const dailyPays = payments.filter((p) => {
         const pDate = new Date(p.date);
         return (
@@ -237,7 +271,6 @@ const ShopLedger = () => {
       const dayRate = dailyColls.length > 0 ? dailyColls[0].ratePerKg : 0;
       const dayWasteBill = dailyColls.reduce((sum, c) => sum + c.amount, 0);
 
-      // Debit = Paid to Shop | Credit = Adjustment (Added to bill)
       const dayPaid = dailyPays
         .filter((p) => p.paymentType !== "Credit")
         .reduce((sum, p) => sum + p.amount, 0);
@@ -245,7 +278,6 @@ const ShopLedger = () => {
         .filter((p) => p.paymentType === "Credit")
         .reduce((sum, p) => sum + p.amount, 0);
 
-      // Balance Logic: Pichla Balance + Aaj Ka Bill + Adjustments - Aaj Ki Payment
       currentBalance = currentBalance + dayWasteBill + dayCreditAdj - dayPaid;
 
       totalRegisterKg += dayWeight;
@@ -276,7 +308,6 @@ const ShopLedger = () => {
   const registerReport =
     viewMode === "register" ? generateDailyRegister() : null;
 
-  // 🔥 NAYA: Excel Export Function
   const exportToExcel = () => {
     if (!registerReport) return;
 
@@ -286,9 +317,9 @@ const ShopLedger = () => {
         `Shop Name: ${ledgerData.shopDetails?.shopName} (${ledgerData.shopDetails?.ownerName})`,
       ],
       [`Month: ${selectedMonth}`],
-      [], // Empty row
+      [],
       ["Opening Balance (Rs):", openingBalance],
-      [], // Empty row
+      [],
       [
         "Date",
         "Weight (KG)",
@@ -324,14 +355,13 @@ const ShopLedger = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Daily_Register");
 
-    // Auto-adjust column widths
     const wscols = [
-      { wch: 15 }, // Date
-      { wch: 15 }, // Weight
-      { wch: 10 }, // Rate
-      { wch: 15 }, // Waste Bill
-      { wch: 20 }, // Paid
-      { wch: 15 }, // Balance
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 15 },
     ];
     ws["!cols"] = wscols;
 
@@ -360,7 +390,6 @@ const ShopLedger = () => {
           <div
             className={`flex gap-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
           >
-            {/* Excel Button */}
             {viewMode === "register" && (
               <button
                 onClick={exportToExcel}
@@ -543,7 +572,6 @@ const ShopLedger = () => {
               onSubmit={handlePaymentSubmit}
               className={`grid grid-cols-1 md:grid-cols-5 gap-4 ${language === "ur" ? "text-right" : "text-left"}`}
             >
-              {/* Payment Form Inputs remain the same */}
               <div>
                 <label className="block text-sm text-indigo-700 mb-1">
                   {t("Date")}
@@ -646,7 +674,7 @@ const ShopLedger = () => {
         )}
       </div>
 
-      {localSummary && (
+      {ledgerData && (
         <div className="space-y-6">
           <div className="hidden print:block text-center mb-4">
             <h2 className="text-2xl font-bold border-b pb-2 text-black">
@@ -668,7 +696,6 @@ const ShopLedger = () => {
 
           {viewMode === "ledger" && (
             <>
-              {/* Ledger View Code Remains the Same */}
               <div
                 className={`grid grid-cols-1 md:grid-cols-4 gap-4 ${language === "ur" ? "text-right" : "text-left"}`}
               >
@@ -851,6 +878,15 @@ const ShopLedger = () => {
                                 >
                                   <Edit size={16} />
                                 </button>
+                              ) : row.type === "Collection" ? (
+                                // 🔥 NAYA: Collection Edit Button
+                                <button
+                                  onClick={() => handleEditWeightClick(row)}
+                                  className="text-green-600 hover:bg-green-50 p-1.5 rounded transition"
+                                  title={t("Edit Weight")}
+                                >
+                                  <Edit size={16} />
+                                </button>
                               ) : (
                                 "-"
                               )}
@@ -865,10 +901,8 @@ const ShopLedger = () => {
             </>
           )}
 
-          {/* ----- 🔥 NAYA: VIP 1-31 REGISTER VIEW (With Daily Balance) ----- */}
           {viewMode === "register" && registerReport && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-none print:shadow-none">
-              {/* VIP PDF Styling Container */}
               <div className="overflow-x-auto print:overflow-visible print:w-full">
                 <table
                   className={`w-full border-collapse ${language === "ur" ? "text-right" : "text-left"} print:text-sm`}
@@ -996,6 +1030,73 @@ const ShopLedger = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 🔥 NAYA: Weight Edit Modal */}
+      {showWeightModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 print:hidden">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h3
+              className={`text-xl font-bold mb-4 text-gray-800 border-b pb-2 ${language === "ur" ? "text-right" : "text-left"}`}
+            >
+              {t("Edit Waste Weight")}
+            </h3>
+            <form
+              onSubmit={handleWeightUpdateSubmit}
+              className={`space-y-4 ${language === "ur" ? "text-right" : "text-left"}`}
+            >
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  {t("Date")}
+                </label>
+                <input
+                  type="text"
+                  value={editWeightData.date}
+                  disabled
+                  className={`w-full border bg-gray-100 rounded-lg px-3 py-2 outline-none text-gray-500 cursor-not-allowed ${language === "ur" ? "text-right" : "text-left"}`}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  {t("New Weight (KG) *")}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  required
+                  value={editWeightData.weightKg}
+                  onChange={(e) =>
+                    setEditWeightData({
+                      ...editWeightData,
+                      weightKg: e.target.value,
+                    })
+                  }
+                  className={`w-full border rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
+                />
+              </div>
+              <div
+                className={`flex gap-3 w-full mt-6 ${language === "ur" ? "flex-row-reverse" : ""}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowWeightModal(false)}
+                  disabled={loading}
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors"
+                >
+                  {t("Cancel")}
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 py-2.5 bg-green-600 text-white font-medium rounded-xl hover:bg-green-700 transition-colors shadow-sm flex justify-center items-center gap-2"
+                >
+                  {loading ? t("Saving...") : t("Update Weight")}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
