@@ -23,7 +23,11 @@ const Shops = () => {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
+
+  // 🔥 NAYA: Status filter (Default "Active" rakha hai taake Inactive dukaanein chup jayen)
   const [routeFilter, setRouteFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Active");
+
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -96,8 +100,6 @@ const Shops = () => {
     });
     setShowForm(true);
 
-    // 🔥 VIP JADOO: Smooth Scroll to Top
-    // SetTimeout is liye taake form pehle screen par render ho jaye phir us par scroll ho
     setTimeout(() => {
       document
         .getElementById("page-top")
@@ -119,18 +121,23 @@ const Shops = () => {
     }
   };
 
-  const filteredShopsList = routeFilter
-    ? shopsList.filter((s) => s.assignedRoute?._id === routeFilter)
-    : shopsList;
+  // 🔥 NAYA: Route aur Status dono ko dekh kar list banayega
+  const filteredShopsList = shopsList.filter((s) => {
+    const matchRoute = routeFilter
+      ? s.assignedRoute?._id === routeFilter
+      : true;
+    const matchStatus =
+      statusFilter === "All" ? true : s.status === statusFilter;
+    return matchRoute && matchStatus;
+  });
 
   return (
-    // 🔥 NAYA: is main div ko id="page-top" de di hai
     <div
       id="page-top"
       className={`space-y-6 relative w-full ${language === "ur" ? "text-right" : "text-left"}`}
     >
       <div
-        className={`flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 gap-4 ${language === "ur" ? "md:flex-row-reverse" : ""}`}
+        className={`flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 gap-4 ${language === "ur" ? "lg:flex-row-reverse" : ""}`}
       >
         <div>
           <h1
@@ -139,9 +146,25 @@ const Shops = () => {
             <Store className="text-cyan-600" /> {t("Shops Management")}
           </h1>
         </div>
+
         <div
-          className={`flex items-center gap-3 w-full md:w-auto ${language === "ur" ? "flex-row-reverse" : ""}`}
+          className={`flex flex-wrap items-center gap-3 w-full lg:w-auto ${language === "ur" ? "flex-row-reverse" : ""}`}
         >
+          {/* Status Filter */}
+          <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg flex-1 md:flex-none">
+            <Filter size={16} className="text-purple-500" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className={`bg-transparent outline-none text-sm font-semibold text-purple-800 w-full ${language === "ur" ? "text-right" : ""}`}
+            >
+              <option value="Active">{t("Active")}</option>
+              <option value="Inactive">{t("Inactive")}</option>
+              <option value="All">All Shops</option>
+            </select>
+          </div>
+
+          {/* Route Filter */}
           <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg flex-1 md:flex-none">
             <Filter size={16} className="text-gray-500" />
             <select
@@ -164,7 +187,7 @@ const Shops = () => {
                 setShowForm(!showForm);
                 if (showForm) setEditId(null);
               }}
-              className={`bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-2 hover:bg-green-700 transition-colors ${language === "ur" ? "flex-row-reverse" : ""}`}
+              className={`bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-2 hover:bg-green-700 transition-colors flex-1 md:flex-none ${language === "ur" ? "flex-row-reverse" : ""}`}
             >
               {showForm ? (
                 t("Cancel")
@@ -333,7 +356,7 @@ const Shops = () => {
                     colSpan={user?.role === "Admin" ? 6 : 5}
                     className="text-center py-8 text-gray-500"
                   >
-                    {t("No shops found. Please add a new shop.")}
+                    {t("No shops found.")}
                   </td>
                 </tr>
               ) : (
