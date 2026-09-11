@@ -26,7 +26,6 @@ const Shops = () => {
   const [routeFilter, setRouteFilter] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 🔥 NAYA: Form se serialNumber hata diya gaya hai
   const [formData, setFormData] = useState({
     shopName: "",
     ownerName: "",
@@ -96,7 +95,14 @@ const Shops = () => {
       status: shop.status,
     });
     setShowForm(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    // 🔥 VIP JADOO: Smooth Scroll to Top
+    // SetTimeout is liye taake form pehle screen par render ho jaye phir us par scroll ho
+    setTimeout(() => {
+      document
+        .getElementById("page-top")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
   };
 
   const executeDelete = async () => {
@@ -118,7 +124,9 @@ const Shops = () => {
     : shopsList;
 
   return (
+    // 🔥 NAYA: is main div ko id="page-top" de di hai
     <div
+      id="page-top"
       className={`space-y-6 relative w-full ${language === "ur" ? "text-right" : "text-left"}`}
     >
       <div
@@ -181,7 +189,6 @@ const Shops = () => {
             onSubmit={handleSubmit}
             className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${language === "ur" ? "text-right" : "text-left"}`}
           >
-            {/* 🔥 Serial Number wala input yahan se completely hata diya gaya hai */}
             <div>
               <label className="block text-sm text-gray-600 mb-1">
                 {t("Shop Name *")}
@@ -335,7 +342,6 @@ const Shops = () => {
                     key={shop._id}
                     className="border-b hover:bg-gray-50 text-sm transition-colors"
                   >
-                    {/* 🔥 NAYA: Sirf Static Text Print ho raha hai */}
                     <td
                       className={`px-4 py-3 font-black text-indigo-700 text-lg ${language === "ur" ? "text-right" : "text-left"}`}
                     >
@@ -410,7 +416,6 @@ const Shops = () => {
                 className={`flex justify-between items-center border-b border-gray-100 pb-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
               >
                 <div className="flex items-center gap-2">
-                  {/* 🔥 NAYA: Static Account Number */}
                   <span className="bg-indigo-100 text-indigo-800 font-black px-2 py-1 rounded text-sm">
                     #{shop.serialNumber}
                   </span>
