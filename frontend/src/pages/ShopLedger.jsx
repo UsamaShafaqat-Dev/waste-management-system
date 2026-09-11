@@ -6,7 +6,6 @@ import {
   CreditCard,
   Plus,
   ArrowDownRight,
-  ArrowUpRight,
   Printer,
   Edit,
   Search,
@@ -14,6 +13,7 @@ import {
   Table as TableIcon,
   List,
   FileSpreadsheet,
+  AlertTriangle,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
@@ -47,7 +47,6 @@ const ShopLedger = () => {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [editPaymentId, setEditPaymentId] = useState(null);
 
-  // 🔥 NAYA: Weight Edit Modal State
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [editWeightData, setEditWeightData] = useState({
     id: null,
@@ -61,7 +60,7 @@ const ShopLedger = () => {
     date: new Date().toISOString().split("T")[0],
     amount: "",
     paymentType: "Debit",
-    paymentMethod: "Cash",
+    paymentMethod: "Check", // Default changed to check for convenience
     notes: "",
   });
 
@@ -162,7 +161,7 @@ const ShopLedger = () => {
 
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
-    if (!paymentData.amount || paymentData.amount <= 0) {
+    if (!paymentData.amount || paymentData.amount === 0) {
       return toast.error("Please enter a valid amount");
     }
 
@@ -183,7 +182,7 @@ const ShopLedger = () => {
         date: new Date().toISOString().split("T")[0],
         amount: "",
         paymentType: "Debit",
-        paymentMethod: "Cash",
+        paymentMethod: "Check",
         notes: "",
       });
       setEditPaymentId(null);
@@ -209,7 +208,6 @@ const ShopLedger = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // 🔥 NAYA: Weight Edit Handlers
   const handleEditWeightClick = (collectionRow) => {
     setEditWeightData({
       id: collectionRow._id,
@@ -230,7 +228,7 @@ const ShopLedger = () => {
       });
       toast.success(t("Weight updated successfully!"));
       setShowWeightModal(false);
-      fetchLedger(); // 🔥 Jadoo: Yahan ledger wapis fetch hoga toh sara 1-31 ka hisab theek ho jayega
+      fetchLedger();
     } catch (error) {
       toast.error(error.response?.data?.message || "Error updating weight");
     } finally {
@@ -238,6 +236,7 @@ const ShopLedger = () => {
     }
   };
 
+  // 🔥 NAYA: Advanced 1-31 Register (Ab isme notes aur descriptions aayengi)
   const generateDailyRegister = () => {
     if (!ledgerData || !selectedMonth) return null;
 
@@ -267,6 +266,17 @@ const ShopLedger = () => {
         );
       });
 
+      // Description / Notes logic
+      let descArr = [];
+      if (dailyColls.length > 0) descArr.push(t("Waste Collection"));
+
+      dailyPays.forEach((p) => {
+        let txt = p.paymentType === "Credit" ? t("Adjustment") : t("Payment");
+        if (p.paymentMethod) txt += ` (${t(p.paymentMethod)})`;
+        if (p.notes) txt += ` - ${p.notes}`;
+        descArr.push(txt);
+      });
+
       const dayWeight = dailyColls.reduce((sum, c) => sum + c.weightKg, 0);
       const dayRate = dailyColls.length > 0 ? dailyColls[0].ratePerKg : 0;
       const dayWasteBill = dailyColls.reduce((sum, c) => sum + c.amount, 0);
@@ -287,6 +297,7 @@ const ShopLedger = () => {
       dailyData.push({
         day,
         dateStr: `${day.toString().padStart(2, "0")}-${month}-${year}`,
+        description: descArr.join(" | "), // 🔥 Notes add ho gaye
         weight: dayWeight,
         rate: dayRate,
         wasteBill: dayWasteBill,
@@ -322,6 +333,7 @@ const ShopLedger = () => {
       [],
       [
         "Date",
+        "Description / Notes", // 🔥 Description in Excel
         "Weight (KG)",
         "Rate (Rs)",
         "Waste Bill (Rs)",
@@ -333,6 +345,7 @@ const ShopLedger = () => {
     registerReport.dailyData.forEach((d) => {
       wsData.push([
         d.dateStr,
+        d.description || "-",
         d.weight || 0,
         d.rate || 0,
         d.wasteBill + d.creditAdj || 0,
@@ -344,6 +357,7 @@ const ShopLedger = () => {
     wsData.push([]);
     wsData.push([
       "TOTAL",
+      "",
       registerReport.totalRegisterKg,
       "",
       registerReport.totalRegisterWasteBill,
@@ -357,6 +371,7 @@ const ShopLedger = () => {
 
     const wscols = [
       { wch: 15 },
+      { wch: 40 }, // Description width
       { wch: 15 },
       { wch: 10 },
       { wch: 15 },
@@ -534,11 +549,7 @@ const ShopLedger = () => {
           <div className="bg-gray-100 p-1 rounded-lg flex shadow-sm border border-gray-200">
             <button
               onClick={() => setViewMode("ledger")}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-md font-medium text-sm transition-all ${
-                viewMode === "ledger"
-                  ? "bg-white text-indigo-700 shadow-sm"
-                  : "text-gray-600 hover:bg-gray-200"
-              } ${language === "ur" ? "flex-row-reverse" : ""}`}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-md font-medium text-sm transition-all ${viewMode === "ledger" ? "bg-white text-indigo-700 shadow-sm" : "text-gray-600 hover:bg-gray-200"} ${language === "ur" ? "flex-row-reverse" : ""}`}
             >
               <List size={18} /> {t("Ledger / Payments View")}
             </button>
@@ -547,11 +558,7 @@ const ShopLedger = () => {
                 setViewMode("register");
                 setShowPaymentForm(false);
               }}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-md font-medium text-sm transition-all ${
-                viewMode === "register"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-gray-600 hover:bg-gray-200"
-              } ${language === "ur" ? "flex-row-reverse" : ""}`}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-md font-medium text-sm transition-all ${viewMode === "register" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-200"} ${language === "ur" ? "flex-row-reverse" : ""}`}
             >
               <TableIcon size={18} /> {t("1-31 Daily Register")}
             </button>
@@ -696,6 +703,7 @@ const ShopLedger = () => {
 
           {viewMode === "ledger" && (
             <>
+              {/* Ledger Summary */}
               <div
                 className={`grid grid-cols-1 md:grid-cols-4 gap-4 ${language === "ur" ? "text-right" : "text-left"}`}
               >
@@ -736,6 +744,7 @@ const ShopLedger = () => {
                 </div>
               </div>
 
+              {/* Ledger Table */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="overflow-x-auto print:overflow-visible print:w-full">
                   <table
@@ -803,7 +812,6 @@ const ShopLedger = () => {
                           <td className="print:hidden"></td>
                         )}
                       </tr>
-
                       {ledgerHistory.map((row, index) => (
                         <tr
                           key={index}
@@ -879,7 +887,6 @@ const ShopLedger = () => {
                                   <Edit size={16} />
                                 </button>
                               ) : row.type === "Collection" ? (
-                                // 🔥 NAYA: Collection Edit Button
                                 <button
                                   onClick={() => handleEditWeightClick(row)}
                                   className="text-green-600 hover:bg-green-50 p-1.5 rounded transition"
@@ -901,6 +908,7 @@ const ShopLedger = () => {
             </>
           )}
 
+          {/* 🔥 1-31 REGISTER VIEW - AB Isme Notes aur Description show hongi */}
           {viewMode === "register" && registerReport && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-none print:shadow-none">
               <div className="overflow-x-auto print:overflow-visible print:w-full">
@@ -913,6 +921,11 @@ const ShopLedger = () => {
                         className={`px-3 py-2 print:p-1 border border-gray-300 font-bold whitespace-nowrap ${language === "ur" ? "text-right" : "text-center"}`}
                       >
                         {t("Date")}
+                      </th>
+                      <th
+                        className={`px-3 py-2 print:p-1 border border-gray-300 font-bold ${language === "ur" ? "text-left" : "text-center"}`}
+                      >
+                        {t("Description / Notes")}
                       </th>
                       <th
                         className={`px-3 py-2 print:p-1 border border-gray-300 font-bold ${language === "ur" ? "text-left" : "text-center"}`}
@@ -944,7 +957,7 @@ const ShopLedger = () => {
                   <tbody>
                     <tr className="bg-gray-100 print:bg-white text-sm">
                       <td
-                        colSpan="5"
+                        colSpan="6"
                         className="px-3 py-2 print:p-1 border border-gray-300 font-bold text-gray-800 print:text-black text-right"
                       >
                         {t("Opening Balance:")}
@@ -963,6 +976,12 @@ const ShopLedger = () => {
                         >
                           {dayData.dateStr}
                         </td>
+                        {/* 🔥 Description / Notes Column */}
+                        <td
+                          className={`px-3 py-2 print:p-1 text-gray-600 print:text-black border border-gray-300 ${language === "ur" ? "text-left" : "text-left"}`}
+                        >
+                          {dayData.description || "-"}
+                        </td>
                         <td
                           className={`px-3 py-2 print:p-1 font-medium ${dayData.weight > 0 ? "text-blue-700" : "text-gray-400"} print:text-black border border-gray-300 ${language === "ur" ? "text-left" : "text-center"}`}
                         >
@@ -973,17 +992,18 @@ const ShopLedger = () => {
                         >
                           {dayData.rate > 0 ? `Rs. ${dayData.rate}` : "-"}
                         </td>
+                        {/* 🔥 Display logic fixed so amounts show properly even if negative */}
                         <td
-                          className={`px-3 py-2 print:p-1 font-semibold ${dayData.wasteBill > 0 ? "text-indigo-600" : "text-gray-400"} print:text-black border border-gray-300 ${language === "ur" ? "text-left" : "text-center"}`}
+                          className={`px-3 py-2 print:p-1 font-semibold ${dayData.wasteBill + dayData.creditAdj !== 0 ? "text-indigo-600" : "text-gray-400"} print:text-black border border-gray-300 ${language === "ur" ? "text-left" : "text-center"}`}
                         >
-                          {dayData.wasteBill > 0
-                            ? `Rs. ${dayData.wasteBill.toLocaleString()}`
+                          {dayData.wasteBill + dayData.creditAdj !== 0
+                            ? `Rs. ${(dayData.wasteBill + dayData.creditAdj).toLocaleString()}`
                             : "-"}
                         </td>
                         <td
-                          className={`px-3 py-2 print:p-1 font-semibold ${dayData.paid > 0 ? "text-red-600" : "text-gray-400"} print:text-black border border-gray-300 ${language === "ur" ? "text-left" : "text-center"}`}
+                          className={`px-3 py-2 print:p-1 font-semibold ${dayData.paid !== 0 ? "text-red-600" : "text-gray-400"} print:text-black border border-gray-300 ${language === "ur" ? "text-left" : "text-center"}`}
                         >
-                          {dayData.paid > 0
+                          {dayData.paid !== 0
                             ? `Rs. ${dayData.paid.toLocaleString()}`
                             : "-"}
                         </td>
@@ -998,7 +1018,8 @@ const ShopLedger = () => {
                   <tfoot>
                     <tr className="bg-gray-800 text-white print:bg-gray-200 print:text-black font-bold">
                       <td
-                        className={`px-3 py-3 print:p-2 border border-gray-600 ${language === "ur" ? "text-right" : "text-center"}`}
+                        colSpan="2"
+                        className={`px-3 py-3 print:p-2 border border-gray-600 ${language === "ur" ? "text-right" : "text-right"}`}
                       >
                         {t("Total")}
                       </td>
@@ -1033,7 +1054,7 @@ const ShopLedger = () => {
         </div>
       )}
 
-      {/* 🔥 NAYA: Weight Edit Modal */}
+      {/* Weight Edit Modal */}
       {showWeightModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 print:hidden">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
