@@ -3,17 +3,15 @@ const router = express.Router();
 const {
   getShopTotalWeight,
   createFactoryWeight,
-  getFactoryWeights, // Naya history mangwane wala function
-  updateFactoryWeight, // Naya update karne wala function
+  getFactoryWeights,
+  updateFactoryWeight,
+  deleteFactoryWeight, // 🔥 Yeh NAYA function import hona zaroori hai
 } = require("../controllers/factoryWeightController");
 
-// Get total shop weight for a specific route & date
 router.route("/shop-total").get(getShopTotalWeight);
-
-// Create new factory weight AND Get all history (Monthly Report)
 router.route("/").post(createFactoryWeight).get(getFactoryWeights);
 
-// Update existing factory weight (Admin Edit)
-router.route("/:id").put(updateFactoryWeight);
+// 🔥 NAYA: .delete(deleteFactoryWeight) is line mein aakhir mein add karna zaroori hai
+router.route("/:id").put(updateFactoryWeight).delete(deleteFactoryWeight);
 
 module.exports = router;
