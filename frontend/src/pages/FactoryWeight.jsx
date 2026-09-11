@@ -9,6 +9,9 @@ import {
   X,
   Filter,
   Download,
+  Trash2, // 🔥 NAYA: Trash icon delete ke liye
+  Loader2, // 🔥 NAYA: Loading spinner ke liye
+  AlertTriangle,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
@@ -34,12 +37,16 @@ const FactoryWeight = () => {
 
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [filterMonth, setFilterMonth] = useState(currentMonth);
-  const [filterRoute, setFilterRoute] = useState(""); // 🔥 NAYA: Report filter by route
+  const [filterRoute, setFilterRoute] = useState("");
   const [historyData, setHistoryData] = useState([]);
 
   const [editModal, setEditModal] = useState({ show: false, data: null });
   const [editWeight, setEditWeight] = useState("");
   const [editNotes, setEditNotes] = useState("");
+
+  // 🔥 NAYA: Delete Modal aur Loading State
+  const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchRoutes = async () => {
@@ -55,7 +62,6 @@ const FactoryWeight = () => {
 
   const fetchHistory = async () => {
     try {
-      // 🔥 NAYA: Route filter API me bheja ja raha hai
       let url = `/factory-weights?month=${filterMonth}`;
       if (filterRoute) url += `&routeId=${filterRoute}`;
 
@@ -68,7 +74,7 @@ const FactoryWeight = () => {
 
   useEffect(() => {
     fetchHistory();
-  }, [filterMonth, filterRoute]); // Route change honay pe bhi API call hogi
+  }, [filterMonth, filterRoute]);
 
   useEffect(() => {
     if (!selectedRoute || !date) {
@@ -144,6 +150,21 @@ const FactoryWeight = () => {
       fetchHistory();
     } catch (error) {
       toast.error("Failed to update record");
+    }
+  };
+
+  // 🔥 NAYA: Delete Logic with loading spinner lock
+  const executeDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await api.delete(`/factory-weights/${deleteModal.id}`);
+      toast.success(t("Record deleted successfully!"));
+      fetchHistory();
+    } catch (error) {
+      toast.error(error.response?.data?.message || t("Error deleting record"));
+    } finally {
+      setIsDeleting(false);
+      setDeleteModal({ show: false, id: null });
     }
   };
 
@@ -320,7 +341,6 @@ const FactoryWeight = () => {
           <div
             className={`flex flex-col md:flex-row items-center gap-3 w-full md:w-auto ${language === "ur" ? "md:flex-row-reverse" : ""}`}
           >
-            {/* 🔥 NAYA: Route Filter for Monthly Report */}
             <select
               value={filterRoute}
               onChange={(e) => setFilterRoute(e.target.value)}
@@ -387,7 +407,7 @@ const FactoryWeight = () => {
                   {t("Status / Notes")}
                 </th>
                 {user?.role === "Admin" && (
-                  <th className="px-4 py-3 text-center">{t("Edit")}</th>
+                  <th className="px-4 py-3 text-center">{t("Actions")}</th> // 🔥 Title Changed
                 )}
               </tr>
             </thead>
@@ -449,16 +469,33 @@ const FactoryWeight = () => {
                     </td>
                     {user?.role === "Admin" && (
                       <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => {
-                            setEditModal({ show: true, data: row });
-                            setEditWeight(row.factoryWeight);
-                            setEditNotes(row.notes || "");
-                          }}
-                          className="text-blue-600 hover:bg-blue-50 p-1.5 rounded"
+                        <div
+                          className={`flex justify-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
                         >
-                          <Edit size={16} />
-                        </button>
+                          {/* Edit Button */}
+                          <button
+                            onClick={() => {
+                              setEditModal({ show: true, data: row });
+                              setEditWeight(row.factoryWeight);
+                              setEditNotes(row.notes || "");
+                            }}
+                            className="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition"
+                            title={t("Edit")}
+                          >
+                            <Edit size={16} />
+                          </button>
+
+                          {/* 🔥 NAYA: Delete Button */}
+                          <button
+                            onClick={() =>
+                              setDeleteModal({ show: true, id: row._id })
+                            }
+                            className="text-red-600 hover:bg-red-50 p-1.5 rounded transition"
+                            title={t("Delete")}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -525,6 +562,52 @@ const FactoryWeight = () => {
               >
                 {t("Update Record")}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔥 NAYA: Delete Confirmation Modal with Loader */}
+      {deleteModal.show && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <div className="text-center flex flex-col items-center">
+              <div className="h-14 w-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
+                <AlertTriangle size={28} />
+              </div>
+              <h3 className="text-xl font-bold mb-2 text-gray-800">
+                {t("Delete Record?")}
+              </h3>
+              <p className="text-gray-500 text-sm mb-6">
+                {t(
+                  "Are you sure you want to delete this factory weight? This action cannot be undone.",
+                )}
+              </p>
+              <div
+                className={`flex gap-3 w-full ${language === "ur" ? "flex-row-reverse" : ""}`}
+              >
+                <button
+                  onClick={() => setDeleteModal({ show: false, id: null })}
+                  disabled={isDeleting}
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
+                >
+                  {t("Cancel")}
+                </button>
+                <button
+                  onClick={executeDelete}
+                  disabled={isDeleting}
+                  className={`flex-1 py-2.5 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 transition-colors shadow-sm flex justify-center items-center gap-2 ${isDeleting ? "opacity-70 cursor-not-allowed" : ""}`}
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="animate-spin" size={18} />
+                      {t("Deleting...")}
+                    </>
+                  ) : (
+                    t("Yes, Delete")
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -96,12 +96,11 @@ const createFactoryWeight = async (req, res) => {
 // @route   GET /api/factory-weights
 const getFactoryWeights = async (req, res) => {
   try {
-    // 🔥 NAYA: routeId add kiya gaya hai
     const { month, date, routeId } = req.query;
     let matchQuery = {};
 
     if (routeId) {
-      matchQuery.route = routeId; // Agar route selected hai toh filter lagao
+      matchQuery.route = routeId;
     }
 
     if (date) {
@@ -151,9 +150,24 @@ const updateFactoryWeight = async (req, res) => {
   }
 };
 
+// 🔥 NAYA: Delete Factory Weight function
+// @desc    Delete Factory Weight
+// @route   DELETE /api/factory-weights/:id
+const deleteFactoryWeight = async (req, res) => {
+  try {
+    const record = await FactoryWeight.findByIdAndDelete(req.params.id);
+    if (!record) return res.status(404).json({ message: "Record not found" });
+
+    res.status(200).json({ message: "Record deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getShopTotalWeight,
   createFactoryWeight,
   getFactoryWeights,
   updateFactoryWeight,
+  deleteFactoryWeight, // 👈 Export mein zaroor likhna hai
 };
