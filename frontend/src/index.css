@@ -5,24 +5,27 @@ body {
 }
 
 /* ========================================== */
-/* 🔥 JAMEEL NOORI NASTALEEQ FONT JADOO 🔥 */
+/* 🔥 URDU FONTS JADOO (DESKTOP + MOBILE) 🔥 */
 /* ========================================== */
 
 @font-face {
   font-family: "Jameel Noori Nastaleeq";
   src:
+    local("Jameel Noori Nastaleeq"),
     url("https://cdn.jsdelivr.net/gh/Nafees-Urdu/Nafees-Nastaleeq@master/JameelNooriNastaleeq.woff2")
       format("woff2"),
     url("https://cdn.jsdelivr.net/gh/Nafees-Urdu/Nafees-Nastaleeq@master/JameelNooriNastaleeq.ttf")
       format("truetype");
   font-weight: normal;
   font-style: normal;
-  font-display: swap;
+  font-display: block; /* 'swap' ko 'block' kar diya taake delay mein ghalat English font na chamke */
 }
 
-/* Jab body par .font-urdu class lagegi, toh har cheez ka font badal jayega */
+/* Jab body par .font-urdu class lagegi */
 body.font-urdu * {
-  font-family: "Jameel Noori Nastaleeq", sans-serif !important;
-  line-height: 1.8 !important; /* Nastaleeq ko thori extra line-height chahiye hoti hai */
+  /* Agar Desktop hai toh Jameel Noori chalega, agar Mobile par Jameel Noori fail ho gaya toh Google ka Noto Nastaliq chal jayega! */
+  font-family:
+    "Jameel Noori Nastaleeq", "Noto Nastaliq Urdu", Arial, sans-serif !important;
+  line-height: 1.9 !important;
   letter-spacing: normal !important;
 }
