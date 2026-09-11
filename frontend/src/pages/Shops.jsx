@@ -25,7 +25,8 @@ const Shops = () => {
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
 
   const [routeFilter, setRouteFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("Active");
+  // 🔥 NAYA: "Active" ki jagah "All" kar diya taake shuru mein saari shops show hon
+  const [statusFilter, setStatusFilter] = useState("All");
 
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -106,7 +107,6 @@ const Shops = () => {
     }, 100);
   };
 
-  // 🔥 NAYA: VIP Delete Logic jo kabhi stuck nahi hogi
   const executeDelete = async () => {
     setIsDeleting(true);
     try {
@@ -114,13 +114,11 @@ const Shops = () => {
       toast.success(t("Deleted successfully!"));
       fetchData();
     } catch (error) {
-      // Asli error message dikhayega (e.g., "Cannot delete shop with existing ledger")
       const errorMsg =
         error.response?.data?.message || t("Error deleting shop.");
       toast.error(errorMsg, { duration: 4000 });
     } finally {
       setIsDeleting(false);
-      // 🔥 Error aaye ya na aaye, modal zaroor band ho jayega taake screen atak na jaye
       setDeleteModal({ show: false, id: null });
     }
   };
