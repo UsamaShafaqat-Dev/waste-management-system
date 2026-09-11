@@ -60,7 +60,7 @@ const ShopLedger = () => {
     date: new Date().toISOString().split("T")[0],
     amount: "",
     paymentType: "Debit",
-    paymentMethod: "Check", // Default changed to check for convenience
+    paymentMethod: "Check",
     notes: "",
   });
 
@@ -236,7 +236,6 @@ const ShopLedger = () => {
     }
   };
 
-  // 🔥 NAYA: Advanced 1-31 Register (Ab isme notes aur descriptions aayengi)
   const generateDailyRegister = () => {
     if (!ledgerData || !selectedMonth) return null;
 
@@ -266,7 +265,6 @@ const ShopLedger = () => {
         );
       });
 
-      // Description / Notes logic
       let descArr = [];
       if (dailyColls.length > 0) descArr.push(t("Waste Collection"));
 
@@ -297,7 +295,7 @@ const ShopLedger = () => {
       dailyData.push({
         day,
         dateStr: `${day.toString().padStart(2, "0")}-${month}-${year}`,
-        description: descArr.join(" | "), // 🔥 Notes add ho gaye
+        description: descArr.join(" | "),
         weight: dayWeight,
         rate: dayRate,
         wasteBill: dayWasteBill,
@@ -333,7 +331,7 @@ const ShopLedger = () => {
       [],
       [
         "Date",
-        "Description / Notes", // 🔥 Description in Excel
+        "Description / Notes",
         "Weight (KG)",
         "Rate (Rs)",
         "Waste Bill (Rs)",
@@ -371,7 +369,7 @@ const ShopLedger = () => {
 
     const wscols = [
       { wch: 15 },
-      { wch: 40 }, // Description width
+      { wch: 40 },
       { wch: 15 },
       { wch: 10 },
       { wch: 15 },
@@ -825,10 +823,11 @@ const ShopLedger = () => {
                               language === "ur" ? "ur-PK" : "en-US",
                             )}
                           </td>
+                          {/* 🔥 NAYA: Ledger View Description Formatting based on Language */}
                           <td className="px-6 py-3">
                             {row.type === "Collection" ? (
                               <span
-                                className={`flex items-center gap-1 text-green-700 print:text-black ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
+                                className={`flex items-center gap-1 print:text-black ${language === "ur" ? "flex-row-reverse justify-end font-bold text-lg text-green-700" : "text-green-700"}`}
                               >
                                 <ArrowDownRight
                                   size={14}
@@ -839,12 +838,14 @@ const ShopLedger = () => {
                             ) : (
                               <div>
                                 <span
-                                  className={`flex items-center gap-1 font-medium ${row.paymentType === "Credit" ? "text-green-700" : "text-red-700"} print:text-black ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
+                                  className={`flex items-center gap-1 print:text-black ${language === "ur" ? "flex-row-reverse justify-end font-bold text-lg " + (row.paymentType === "Credit" ? "text-green-700" : "text-red-700") : "font-medium " + (row.paymentType === "Credit" ? "text-green-700" : "text-red-700")}`}
                                 >
                                   {t("Payment")} - {t(row.paymentMethod)}
                                 </span>
                                 {row.notes && (
-                                  <div className="text-xs text-gray-500 print:text-black mt-1 font-medium">
+                                  <div
+                                    className={`text-gray-500 print:text-black mt-1 ${language === "ur" ? "font-bold text-base" : "text-xs font-medium"}`}
+                                  >
                                     {t("Note:")} {row.notes}
                                   </div>
                                 )}
@@ -908,7 +909,7 @@ const ShopLedger = () => {
             </>
           )}
 
-          {/* 🔥 1-31 REGISTER VIEW - AB Isme Notes aur Description show hongi */}
+          {/* 🔥 1-31 REGISTER VIEW - Formatting adjusted for Urdu */}
           {viewMode === "register" && registerReport && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-none print:shadow-none">
               <div className="overflow-x-auto print:overflow-visible print:w-full">
@@ -976,9 +977,9 @@ const ShopLedger = () => {
                         >
                           {dayData.dateStr}
                         </td>
-                        {/* 🔥 Description / Notes Column */}
+                        {/* 🔥 NAYA: 1-31 Register View Description Formatting based on Language */}
                         <td
-                          className={`px-3 py-2 print:p-1 text-gray-600 print:text-black border border-gray-300 ${language === "ur" ? "text-left" : "text-left"}`}
+                          className={`px-3 py-2 print:p-1 border border-gray-300 print:text-black ${language === "ur" ? "text-left font-bold text-lg text-gray-800" : "text-left text-gray-600"}`}
                         >
                           {dayData.description || "-"}
                         </td>
@@ -992,7 +993,6 @@ const ShopLedger = () => {
                         >
                           {dayData.rate > 0 ? `Rs. ${dayData.rate}` : "-"}
                         </td>
-                        {/* 🔥 Display logic fixed so amounts show properly even if negative */}
                         <td
                           className={`px-3 py-2 print:p-1 font-semibold ${dayData.wasteBill + dayData.creditAdj !== 0 ? "text-indigo-600" : "text-gray-400"} print:text-black border border-gray-300 ${language === "ur" ? "text-left" : "text-center"}`}
                         >
