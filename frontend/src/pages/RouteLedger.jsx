@@ -51,6 +51,29 @@ const RouteLedger = () => {
     <div
       className={`space-y-6 print:block print:w-full print:h-auto print:overflow-visible ${language === "ur" ? "text-right" : "text-left"}`}
     >
+      {/* 🔥 VIP JADOO: Global Print Layout Fix */}
+      <style>
+        {`
+          @media print {
+            body, html, #root {
+              height: auto !important;
+              min-height: 100% !important;
+              overflow: visible !important;
+            }
+            .overflow-y-auto, .overflow-x-auto, .overflow-hidden, .h-screen, .max-h-screen, .h-full {
+              height: auto !important;
+              max-height: none !important;
+              overflow: visible !important;
+            }
+            table { page-break-after: auto; }
+            tr    { page-break-inside: avoid; page-break-after: auto; }
+            td    { page-break-inside: avoid; page-break-after: auto; }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+          }
+        `}
+      </style>
+
       <div
         className={`print:hidden bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
       >
@@ -199,7 +222,7 @@ const RouteLedger = () => {
             </div>
           </div>
 
-          {/* 🔥 NAYA: Route Ledger Table with Print Fixes */}
+          {/* Table Area */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:overflow-visible print:border-none print:shadow-none">
             <div
               className={`p-4 border-b bg-gray-50 flex items-center gap-2 print:bg-white print:border-b-2 ${language === "ur" ? "flex-row-reverse" : ""}`}

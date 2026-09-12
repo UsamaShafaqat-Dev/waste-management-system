@@ -388,6 +388,29 @@ const ShopLedger = () => {
     <div
       className={`space-y-6 print:block print:w-full print:h-auto print:overflow-visible ${language === "ur" ? "text-right" : "text-left"}`}
     >
+      {/* 🔥 VIP JADOO: Global Print Layout Fix (Ye code pages ko katne nahi dega) */}
+      <style>
+        {`
+          @media print {
+            body, html, #root {
+              height: auto !important;
+              min-height: 100% !important;
+              overflow: visible !important;
+            }
+            .overflow-y-auto, .overflow-x-auto, .overflow-hidden, .h-screen, .max-h-screen, .h-full {
+              height: auto !important;
+              max-height: none !important;
+              overflow: visible !important;
+            }
+            table { page-break-after: auto; }
+            tr    { page-break-inside: avoid; page-break-after: auto; }
+            td    { page-break-inside: avoid; page-break-after: auto; }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+          }
+        `}
+      </style>
+
       <div
         className={`print:hidden flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 ${language === "ur" ? "flex-row-reverse" : ""}`}
       >
@@ -742,7 +765,7 @@ const ShopLedger = () => {
                 </div>
               </div>
 
-              {/* 🔥 NAYA: Ledger Table with Print Fixes */}
+              {/* Ledger Table */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:overflow-visible print:border-none print:shadow-none">
                 <div className="overflow-x-auto print:overflow-visible print:w-full">
                   <table
@@ -908,7 +931,7 @@ const ShopLedger = () => {
             </>
           )}
 
-          {/* 🔥 NAYA: 1-31 REGISTER VIEW with Print Fixes */}
+          {/* 1-31 REGISTER VIEW */}
           {viewMode === "register" && registerReport && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:overflow-visible print:border-none print:shadow-none">
               <div className="overflow-x-auto print:overflow-visible print:w-full">
