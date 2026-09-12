@@ -47,8 +47,48 @@ const getDashboardStats = async (req, res) => {
     const totalFactoryWeight =
       factoryCollections.length > 0 ? factoryCollections[0].totalWeight : 0;
 
-    // 5. Difference
-    const totalDifference = totalShopWeight - totalFactoryWeight;
+    // 5. Total Difference (Factory Wgt - Shop Wgt)
+    const totalDifference = totalFactoryWeight - totalShopWeight;
+
+    // 🔥 NAYA: Route-wise Breakdown Logic (Client ki demand)
+    const allActiveRoutes = await Route.find({ status: "Active" });
+
+    // Agar koi specific route select kiya hai toh sirf usay dikhayen, warna sab ko.
+    let filteredRoutes = allActiveRoutes;
+    if (matchQuery.route) {
+      filteredRoutes = allActiveRoutes.filter(
+        (r) => r._id.toString() === matchQuery.route.toString(),
+      );
+    }
+
+    // Shop weight route wise nikalo
+    const shopByRoute = await DailyCollection.aggregate([
+      { $match: matchQuery },
+      { $group: { _id: "$route", totalWeight: { $sum: "$weightKg" } } },
+    ]);
+
+    // Factory weight route wise nikalo
+    const factoryByRoute = await FactoryWeight.aggregate([
+      { $match: matchQuery },
+      { $group: { _id: "$route", totalWeight: { $sum: "$factoryWeight" } } },
+    ]);
+
+    // Dono ko aapas mein map kar ke table ka data bana lo
+    const routeBreakdown = filteredRoutes.map((r) => {
+      const rId = r._id.toString();
+      const sWgt =
+        shopByRoute.find((s) => s._id && s._id.toString() === rId)
+          ?.totalWeight || 0;
+      const fWgt =
+        factoryByRoute.find((f) => f._id && f._id.toString() === rId)
+          ?.totalWeight || 0;
+      return {
+        routeName: r.routeName,
+        shopWeight: sWgt,
+        factoryWeight: fWgt,
+        difference: fWgt - sWgt, // Shortage/Extra diff
+      };
+    });
 
     res.status(200).json({
       totalVehicles,
@@ -57,6 +97,7 @@ const getDashboardStats = async (req, res) => {
       totalShopWeight,
       totalFactoryWeight,
       totalDifference,
+      routeBreakdown, // 🔥 NAYA array frontend ke liye
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
