@@ -386,7 +386,7 @@ const ShopLedger = () => {
 
   return (
     <div
-      className={`space-y-6 ${language === "ur" ? "text-right" : "text-left"}`}
+      className={`space-y-6 print:block print:w-full print:h-auto print:overflow-visible ${language === "ur" ? "text-right" : "text-left"}`}
     >
       <div
         className={`print:hidden flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 ${language === "ur" ? "flex-row-reverse" : ""}`}
@@ -742,8 +742,8 @@ const ShopLedger = () => {
                 </div>
               </div>
 
-              {/* Ledger Table */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              {/* 🔥 NAYA: Ledger Table with Print Fixes */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:overflow-visible print:border-none print:shadow-none">
                 <div className="overflow-x-auto print:overflow-visible print:w-full">
                   <table
                     className={`w-full border-collapse min-w-[800px] print:min-w-full ${language === "ur" ? "text-right" : "text-left"}`}
@@ -823,7 +823,6 @@ const ShopLedger = () => {
                               language === "ur" ? "ur-PK" : "en-US",
                             )}
                           </td>
-                          {/* 🔥 NAYA: Ledger View Description Formatting based on Language */}
                           <td className="px-6 py-3">
                             {row.type === "Collection" ? (
                               <span
@@ -909,9 +908,9 @@ const ShopLedger = () => {
             </>
           )}
 
-          {/* 🔥 1-31 REGISTER VIEW - Formatting adjusted for Urdu */}
+          {/* 🔥 NAYA: 1-31 REGISTER VIEW with Print Fixes */}
           {viewMode === "register" && registerReport && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-none print:shadow-none">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:overflow-visible print:border-none print:shadow-none">
               <div className="overflow-x-auto print:overflow-visible print:w-full">
                 <table
                   className={`w-full border-collapse ${language === "ur" ? "text-right" : "text-left"} print:text-sm`}
@@ -977,7 +976,6 @@ const ShopLedger = () => {
                         >
                           {dayData.dateStr}
                         </td>
-                        {/* 🔥 NAYA: 1-31 Register View Description Formatting based on Language */}
                         <td
                           className={`px-3 py-2 print:p-1 border border-gray-300 print:text-black ${language === "ur" ? "text-left font-bold text-lg text-gray-800" : "text-left text-gray-600"}`}
                         >

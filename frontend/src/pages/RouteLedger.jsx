@@ -49,7 +49,7 @@ const RouteLedger = () => {
 
   return (
     <div
-      className={`space-y-6 ${language === "ur" ? "text-right" : "text-left"}`}
+      className={`space-y-6 print:block print:w-full print:h-auto print:overflow-visible ${language === "ur" ? "text-right" : "text-left"}`}
     >
       <div
         className={`print:hidden bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
@@ -199,7 +199,8 @@ const RouteLedger = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          {/* 🔥 NAYA: Route Ledger Table with Print Fixes */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:overflow-visible print:border-none print:shadow-none">
             <div
               className={`p-4 border-b bg-gray-50 flex items-center gap-2 print:bg-white print:border-b-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
             >
@@ -208,13 +209,12 @@ const RouteLedger = () => {
                 {t("Shop Breakdown")}
               </h3>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto print:overflow-visible print:w-full">
               <table
                 className={`w-full border-collapse ${language === "ur" ? "text-right" : "text-left"}`}
               >
                 <thead>
                   <tr className="text-xs text-gray-500 uppercase tracking-wider border-b print:border-b-2">
-                    {/* 🔥 NAYA: Sr. No Column */}
                     <th
                       className={`px-4 py-3 font-medium w-16 ${language === "ur" ? "text-right" : "text-left"}`}
                     >
@@ -268,7 +268,6 @@ const RouteLedger = () => {
                         key={index}
                         className="border-b hover:bg-gray-50 text-sm print:text-black"
                       >
-                        {/* 🔥 NAYA: Sr. No Display (Read-only) */}
                         <td className="px-4 py-3 text-gray-500 font-medium">
                           {shop.serialNumber || index + 1}
                         </td>
@@ -308,7 +307,7 @@ const RouteLedger = () => {
                   <tfoot>
                     <tr className="bg-gray-800 text-white print:bg-gray-200 print:text-black font-bold text-sm">
                       <td
-                        colSpan="3" // 🔥 Span barha diya kyunke ek column zyada ho gaya hai
+                        colSpan="3"
                         className={`px-4 py-4 ${language === "ur" ? "text-left" : "text-right"}`}
                       >
                         {t("Route Totals:")}
