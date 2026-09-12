@@ -50,10 +50,8 @@ const getDashboardStats = async (req, res) => {
     // 5. Total Difference (Factory Wgt - Shop Wgt)
     const totalDifference = totalFactoryWeight - totalShopWeight;
 
-    // 🔥 NAYA: Route-wise Breakdown Logic (Client ki demand)
+    // 6. Route-wise Breakdown Logic
     const allActiveRoutes = await Route.find({ status: "Active" });
-
-    // Agar koi specific route select kiya hai toh sirf usay dikhayen, warna sab ko.
     let filteredRoutes = allActiveRoutes;
     if (matchQuery.route) {
       filteredRoutes = allActiveRoutes.filter(
@@ -61,19 +59,16 @@ const getDashboardStats = async (req, res) => {
       );
     }
 
-    // Shop weight route wise nikalo
     const shopByRoute = await DailyCollection.aggregate([
       { $match: matchQuery },
       { $group: { _id: "$route", totalWeight: { $sum: "$weightKg" } } },
     ]);
 
-    // Factory weight route wise nikalo
     const factoryByRoute = await FactoryWeight.aggregate([
       { $match: matchQuery },
       { $group: { _id: "$route", totalWeight: { $sum: "$factoryWeight" } } },
     ]);
 
-    // Dono ko aapas mein map kar ke table ka data bana lo
     const routeBreakdown = filteredRoutes.map((r) => {
       const rId = r._id.toString();
       const sWgt =
@@ -86,9 +81,24 @@ const getDashboardStats = async (req, res) => {
         routeName: r.routeName,
         shopWeight: sWgt,
         factoryWeight: fWgt,
-        difference: fWgt - sWgt, // Shortage/Extra diff
+        difference: fWgt - sWgt,
       };
     });
+
+    // 🔥 NAYA: Recent Activity (Latest 5 Collections)
+    const recentActivity = await DailyCollection.find(matchQuery)
+      .sort({ _id: -1 }) // Latest pehle
+      .limit(6)
+      .populate("shop", "shopName ownerName")
+      .populate("route", "routeName");
+
+    const formattedRecentActivity = recentActivity.map((item) => ({
+      id: item._id,
+      shopName: item.shop?.shopName || "Unknown Shop",
+      routeName: item.route?.routeName || "Unknown Route",
+      weightKg: item.weightKg,
+      date: item.date,
+    }));
 
     res.status(200).json({
       totalVehicles,
@@ -97,7 +107,8 @@ const getDashboardStats = async (req, res) => {
       totalShopWeight,
       totalFactoryWeight,
       totalDifference,
-      routeBreakdown, // 🔥 NAYA array frontend ke liye
+      routeBreakdown,
+      recentActivity: formattedRecentActivity, // 🔥 Naya data frontend ke liye
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
