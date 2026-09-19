@@ -1,43 +1,48 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const { sequelize } = require("../config/db");
 
-const shopSchema = new mongoose.Schema(
+const Shop = sequelize.define(
+  "Shop",
   {
+    // Frontend compatibility ke liye _id
+    _id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
     shopName: {
-      type: String,
-      required: [true, "Shop name is required"],
-      trim: true,
+      type: DataTypes.STRING,
+      allowNull: false,
     },
     ownerName: {
-      type: String,
-      required: [true, "Owner name is required"],
-      trim: true,
+      type: DataTypes.STRING,
+      allowNull: false,
     },
     contact: {
-      type: String,
-      trim: true,
+      type: DataTypes.STRING,
+      allowNull: true,
     },
     address: {
-      type: String,
-      trim: true,
+      type: DataTypes.STRING,
+      allowNull: true,
     },
     assignedRoute: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Route",
-      required: [true, "A shop must be assigned to a route"],
+      type: DataTypes.INTEGER, // mongoose.Schema.Types.ObjectId ab Integer ban jayega
+      allowNull: false,
     },
     serialNumber: {
-      type: Number,
-      default: 0, // 🔥 Serial Number Field
+      type: DataTypes.INTEGER,
+      defaultValue: 0, // 🔥 Serial Number Field
     },
     status: {
-      type: String,
-      enum: ["Active", "Inactive"],
-      default: "Active",
+      type: DataTypes.ENUM("Active", "Inactive"),
+      defaultValue: "Active",
     },
   },
   {
     timestamps: true,
+    tableName: "shops",
   },
 );
 
-module.exports = mongoose.model("Shop", shopSchema);
+module.exports = Shop;

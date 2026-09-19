@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const DailyCollection = require("../models/DailyCollection");
 const FactoryWeight = require("../models/FactoryWeight");
 const Route = require("../models/Route");
@@ -15,38 +16,25 @@ const getMonthlyBusinessReport = async (req, res) => {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
-    // 1. Get Master Counts
-    const totalRoutes = await Route.countDocuments({ status: "Active" });
-    const totalVehicles = await Vehicle.countDocuments({ status: "Active" });
-    const totalShops = await Shop.countDocuments({ status: "Active" });
+    const matchQuery = {
+      date: { [Op.between]: [startDate, endDate] },
+    };
 
-    // 2. Aggregate Daily Collections (Shop KG and Payable Amount)
-    const collections = await DailyCollection.aggregate([
-      { $match: { date: { $gte: startDate, $lte: endDate } } },
-      {
-        $group: {
-          _id: null,
-          totalShopKg: { $sum: "$weightKg" },
-          totalPayableAmount: { $sum: "$amount" },
-        },
-      },
-    ]);
+    // 1. Get Master Counts (Mongoose countDocuments ki jagah Sequelize count)
+    const totalRoutes = await Route.count({ where: { status: "Active" } });
+    const totalVehicles = await Vehicle.count({ where: { status: "Active" } });
+    const totalShops = await Shop.count({ where: { status: "Active" } });
 
-    // 3. Aggregate Factory Weights[cite: 1]
-    const factory = await FactoryWeight.aggregate([
-      { $match: { date: { $gte: startDate, $lte: endDate } } },
-      {
-        $group: {
-          _id: null,
-          totalFactoryKg: { $sum: "$factoryWeight" },
-        },
-      },
-    ]);
-
-    const shopKg = collections.length > 0 ? collections[0].totalShopKg : 0;
+    // 2. Aggregate Daily Collections (Sequelize ka sum function)
+    const shopKg =
+      (await DailyCollection.sum("weightKg", { where: matchQuery })) || 0;
     const payableAmount =
-      collections.length > 0 ? collections[0].totalPayableAmount : 0;
-    const factoryKg = factory.length > 0 ? factory[0].totalFactoryKg : 0;
+      (await DailyCollection.sum("amount", { where: matchQuery })) || 0;
+
+    // 3. Aggregate Factory Weights
+    const factoryKg =
+      (await FactoryWeight.sum("factoryWeight", { where: matchQuery })) || 0;
+
     const difference = factoryKg - shopKg;
 
     res.status(200).json({

@@ -1,38 +1,44 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const { sequelize } = require("../config/db");
 
-const paymentSchema = new mongoose.Schema(
+const Payment = sequelize.define(
+  "Payment",
   {
+    // Frontend ki compatibility ke liye _id rakha hai
+    _id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
     shop: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Shop",
-      required: true,
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
     date: {
-      type: Date,
-      required: true,
+      type: DataTypes.DATE,
+      allowNull: false,
     },
     amount: {
-      type: Number,
-      required: true,
+      type: DataTypes.FLOAT,
+      allowNull: false,
     },
     paymentType: {
-      type: String,
-      enum: ["Debit", "Credit"],
-      default: "Debit", // Default debit hi rahega
+      type: DataTypes.ENUM("Debit", "Credit"),
+      defaultValue: "Debit", // Default debit hi rahega
     },
     paymentMethod: {
-      type: String,
-      enum: ["Cash", "Check", "Bank Transfer", "Other"],
-      default: "Cash",
+      type: DataTypes.ENUM("Cash", "Check", "Bank Transfer", "Other"),
+      defaultValue: "Cash",
     },
     notes: {
-      type: String,
-      trim: true,
+      type: DataTypes.STRING,
+      allowNull: true,
     },
   },
   {
     timestamps: true,
+    tableName: "payments",
   },
 );
 
-module.exports = mongoose.model("Payment", paymentSchema);
+module.exports = Payment;

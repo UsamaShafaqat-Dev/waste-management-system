@@ -1,6 +1,8 @@
 const FactoryWeight = require("../models/FactoryWeight");
 const DailyCollection = require("../models/DailyCollection");
 const Route = require("../models/Route");
+const Vehicle = require("../models/Vehicle"); // Populate mimic karne ke liye zaroori hai
+const { Op } = require("sequelize");
 
 // @desc    Get total shop weight for a specific route and date
 // @route   GET /api/factory-weights/shop-total?date=YYYY-MM-DD&routeId=XYZ
@@ -17,10 +19,14 @@ const getShopTotalWeight = async (req, res) => {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const collections = await DailyCollection.find({
-      route: routeId,
-      date: { $gte: queryDate, $lte: endOfDay },
-    }).populate("vehicle");
+    // MySQL (Sequelize) query
+    const collections = await DailyCollection.findAll({
+      where: {
+        route: routeId,
+        date: { [Op.between]: [queryDate, endOfDay] },
+      },
+      raw: true, // Plain JS object return karne ke liye
+    });
 
     if (collections.length === 0) {
       return res.status(404).json({
@@ -33,7 +39,10 @@ const getShopTotalWeight = async (req, res) => {
       (sum, item) => sum + item.weightKg,
       0,
     );
-    const vehicle = collections[0].vehicle;
+
+    // Mongoose ke populate("vehicle") ko mimic karne ke liye Vehicle fetch kar rahe hain
+    const vehicleId = collections[0].vehicle;
+    const vehicle = await Vehicle.findByPk(vehicleId);
 
     res.status(200).json({ totalShopWeight, vehicle });
   } catch (error) {
@@ -54,8 +63,10 @@ const createFactoryWeight = async (req, res) => {
     endOfDay.setHours(23, 59, 59, 999);
 
     const existingEntry = await FactoryWeight.findOne({
-      route,
-      date: { $gte: entryDate, $lte: endOfDay },
+      where: {
+        route,
+        date: { [Op.between]: [entryDate, endOfDay] },
+      },
     });
 
     if (existingEntry) {
@@ -82,7 +93,8 @@ const createFactoryWeight = async (req, res) => {
 
     res.status(201).json(newFactoryWeight);
   } catch (error) {
-    if (error.code === 11000) {
+    // MySQL (Sequelize) ka duplicate entry error pakarne ka tareeqa
+    if (error.name === "SequelizeUniqueConstraintError") {
       return res.status(400).json({
         message:
           "Double Entry Detected: Factory weight already saved for this date/route.",
@@ -106,20 +118,50 @@ const getFactoryWeights = async (req, res) => {
     if (date) {
       const queryDate = new Date(date);
       matchQuery.date = {
-        $gte: new Date(queryDate.setHours(0, 0, 0, 0)),
-        $lte: new Date(queryDate.setHours(23, 59, 59, 999)),
+        [Op.between]: [
+          new Date(queryDate.setHours(0, 0, 0, 0)),
+          new Date(queryDate.setHours(23, 59, 59, 999)),
+        ],
       };
     } else if (month) {
       const [year, m] = month.split("-");
       const startDate = new Date(year, m - 1, 1);
       const endDate = new Date(year, m, 0, 23, 59, 59, 999);
-      matchQuery.date = { $gte: startDate, $lte: endDate };
+      matchQuery.date = { [Op.between]: [startDate, endDate] };
     }
 
-    const history = await FactoryWeight.find(matchQuery)
-      .populate("route", "routeName")
-      .populate("vehicle", "vehicleNumber driverName")
-      .sort({ date: -1 });
+    const rawHistory = await FactoryWeight.findAll({
+      where: matchQuery,
+      order: [["date", "DESC"]], // Sequelize sort method
+      raw: true,
+    });
+
+    // Mongoose Populate ko manually handle kar rahe hain taake frontend ko exact data mile
+    const routeIds = [...new Set(rawHistory.map((h) => h.route))];
+    const vehicleIds = [...new Set(rawHistory.map((h) => h.vehicle))];
+
+    const routesList = await Route.findAll({
+      where: { _id: { [Op.in]: routeIds } },
+      raw: true,
+    });
+    const vehiclesList = await Vehicle.findAll({
+      where: { _id: { [Op.in]: vehicleIds } },
+      raw: true,
+    });
+
+    const history = rawHistory.map((h) => {
+      const routeObj = routesList.find((r) => r._id === h.route);
+      const vehicleObj = vehiclesList.find((v) => v._id === h.vehicle);
+      return {
+        ...h,
+        route: routeObj || { _id: h.route, routeName: "Unknown" },
+        vehicle: vehicleObj || {
+          _id: h.vehicle,
+          vehicleNumber: "Unknown",
+          driverName: "Unknown",
+        },
+      };
+    });
 
     res.status(200).json(history);
   } catch (error) {
@@ -132,7 +174,7 @@ const getFactoryWeights = async (req, res) => {
 const updateFactoryWeight = async (req, res) => {
   try {
     const { factoryWeight, notes } = req.body;
-    const record = await FactoryWeight.findById(req.params.id);
+    const record = await FactoryWeight.findByPk(req.params.id);
     if (!record) return res.status(404).json({ message: "Record not found" });
 
     record.factoryWeight = factoryWeight;
@@ -150,13 +192,16 @@ const updateFactoryWeight = async (req, res) => {
   }
 };
 
-// 🔥 NAYA: Delete Factory Weight function
+// 🔥 Delete Factory Weight function
 // @desc    Delete Factory Weight
 // @route   DELETE /api/factory-weights/:id
 const deleteFactoryWeight = async (req, res) => {
   try {
-    const record = await FactoryWeight.findByIdAndDelete(req.params.id);
+    const record = await FactoryWeight.findByPk(req.params.id);
     if (!record) return res.status(404).json({ message: "Record not found" });
+
+    // Sequelize mein delete ke liye destroy() use hota hai
+    await record.destroy();
 
     res.status(200).json({ message: "Record deleted successfully" });
   } catch (error) {
@@ -169,5 +214,5 @@ module.exports = {
   createFactoryWeight,
   getFactoryWeights,
   updateFactoryWeight,
-  deleteFactoryWeight, // 👈 Export mein zaroor likhna hai
+  deleteFactoryWeight,
 };

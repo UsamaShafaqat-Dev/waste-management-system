@@ -15,7 +15,8 @@ const authUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    // 🔥 MySQL (Sequelize) mein data find karne ke liye 'where' lagana parta hai
+    const user = await User.findOne({ where: { email } });
 
     if (user) {
       let isMatch = false;
@@ -32,7 +33,7 @@ const authUser = async (req, res) => {
       // Agar password theek hai toh Login karwa do
       if (isMatch) {
         res.json({
-          _id: user._id,
+          _id: user._id, // Sequelize model mein humne primary key ka naam _id hi rakha tha
           name: user.name,
           email: user.email,
           role: user.role,

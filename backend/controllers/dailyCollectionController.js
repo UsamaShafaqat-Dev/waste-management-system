@@ -1,5 +1,6 @@
 const DailyCollection = require("../models/DailyCollection");
 const Shop = require("../models/Shop");
+const { Op } = require("sequelize"); // Sequelize operators lazmi hain queries ke liye
 
 // @desc    Save daily collection for a route
 // @route   POST /api/daily-collections
@@ -13,10 +14,14 @@ const createDailyCollection = async (req, res) => {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Double Entry Check
+    // Double Entry Check (Sequelize format)
     const existingEntry = await DailyCollection.findOne({
-      route: routeId,
-      date: { $gte: collectionDate, $lte: endOfDay },
+      where: {
+        route: routeId,
+        date: {
+          [Op.between]: [collectionDate, endOfDay],
+        },
+      },
     });
 
     if (existingEntry) {
@@ -35,11 +40,13 @@ const createDailyCollection = async (req, res) => {
       amount: 0,
     }));
 
-    await DailyCollection.insertMany(formattedData);
+    // Sequelize mein bulk insert ke liye bulkCreate use hota hai
+    await DailyCollection.bulkCreate(formattedData);
 
     res.status(201).json({ message: "Daily Collection Saved Successfully!" });
   } catch (error) {
-    if (error.code === 11000) {
+    // MySQL (Sequelize) ka unique index error pakarne ka tareeqa
+    if (error.name === "SequelizeUniqueConstraintError") {
       return res.status(400).json({
         message:
           "Double Entry Detected: A shop in this route already has data for this date.",
@@ -53,9 +60,12 @@ const createDailyCollection = async (req, res) => {
 // @route   GET /api/daily-collections/shops/:routeId
 const getShopsByRoute = async (req, res) => {
   try {
-    const shops = await Shop.find({
-      assignedRoute: req.params.routeId,
-      status: "Active",
+    // Mongoose ke find() ki jagah findAll() aur where lagana parta hai
+    const shops = await Shop.findAll({
+      where: {
+        assignedRoute: req.params.routeId,
+        status: "Active",
+      },
     });
     res.status(200).json(shops);
   } catch (error) {
@@ -71,15 +81,16 @@ const updateCollectionWeight = async (req, res) => {
     const { id } = req.params;
     const { weightKg } = req.body;
 
-    const collection = await DailyCollection.findByIdAndUpdate(
-      id,
-      { weightKg: parseFloat(weightKg) || 0 },
-      { new: true },
-    );
+    // Sequelize mein id se dhoondne ke liye findByPk (Primary Key) use hota hai
+    const collection = await DailyCollection.findByPk(id);
 
     if (!collection) {
       return res.status(404).json({ message: "Collection record not found" });
     }
+
+    // Weight update kar ke database mein save kar do
+    collection.weightKg = parseFloat(weightKg) || 0;
+    await collection.save();
 
     res
       .status(200)

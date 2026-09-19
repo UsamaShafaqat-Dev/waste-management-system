@@ -2,6 +2,7 @@ const Payment = require("../models/Payment");
 const DailyCollection = require("../models/DailyCollection");
 const Shop = require("../models/Shop");
 const MonthlyRate = require("../models/MonthlyRate");
+const Route = require("../models/Route"); // Populate mimic karne ke liye import kiya
 
 // @desc    Add a new payment to a shop
 const addPayment = async (req, res) => {
@@ -29,13 +30,17 @@ const editPayment = async (req, res) => {
   try {
     const { date, amount, paymentType, paymentMethod, notes } = req.body;
 
-    const payment = await Payment.findByIdAndUpdate(
-      req.params.id,
-      { date, amount, paymentType, paymentMethod, notes },
-      { new: true },
-    );
-
+    // Sequelize mein findByIdAndUpdate ki jagah findByPk aur save use hota hai
+    const payment = await Payment.findByPk(req.params.id);
     if (!payment) return res.status(404).json({ message: "Payment not found" });
+
+    payment.date = date;
+    payment.amount = amount;
+    payment.paymentType = paymentType;
+    payment.paymentMethod = paymentMethod;
+    payment.notes = notes;
+
+    await payment.save();
 
     res.status(200).json(payment);
   } catch (error) {
@@ -60,18 +65,37 @@ const getShopLedger = async (req, res) => {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
-    const shop = await Shop.findById(shopId).populate(
-      "assignedRoute",
-      "routeName",
-    );
-    if (!shop) return res.status(404).json({ message: "Shop not found" });
+    // Mongoose populate() ko mimic karne ke liye manual fetch
+    const shopObj = await Shop.findByPk(shopId, { raw: true });
+    if (!shopObj) return res.status(404).json({ message: "Shop not found" });
+
+    const routeObj = await Route.findByPk(shopObj.assignedRoute, { raw: true });
+
+    // Shop object mein route wese hi attach kar diya jaise Mongoose karta tha
+    const shop = {
+      ...shopObj,
+      assignedRoute: routeObj
+        ? { _id: routeObj._id, routeName: routeObj.routeName }
+        : { _id: shopObj.assignedRoute, routeName: "Unknown" },
+    };
 
     // 1. ALL HISTORY FETCH (Taake opening balance nikal sakein)
-    const allCollections = await DailyCollection.find({ shop: shopId }).sort({
-      date: 1,
+    const allCollections = await DailyCollection.findAll({
+      where: { shop: shopId },
+      order: [["date", "ASC"]], // Ascending order
+      raw: true,
     });
-    const allPayments = await Payment.find({ shop: shopId }).sort({ date: 1 });
-    const allRates = await MonthlyRate.find({ shop: shopId });
+
+    const allPayments = await Payment.findAll({
+      where: { shop: shopId },
+      order: [["date", "ASC"]],
+      raw: true,
+    });
+
+    const allRates = await MonthlyRate.findAll({
+      where: { shop: shopId },
+      raw: true,
+    });
 
     let openingPayable = 0;
     let openingPaid = 0;
@@ -137,14 +161,14 @@ const getShopLedger = async (req, res) => {
 
     // Format current month collections
     const updatedCollections = targetCollections.map((c) => ({
-      ...c._doc,
+      ...c, // Sequelize 'raw: true' mein _doc ki zaroorat nahi hoti
       ratePerKg: currentRate,
       amount: c.weightKg * currentRate,
     }));
 
     res.status(200).json({
       shopDetails: shop,
-      openingBalance, // 🔥 NAYA: Opening Balance bhej diya
+      openingBalance, // 🔥 Opening Balance
       summary: {
         totalCollectedKg,
         currentMonthPayable,

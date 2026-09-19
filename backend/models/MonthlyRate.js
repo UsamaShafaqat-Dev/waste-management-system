@@ -1,20 +1,44 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const { sequelize } = require("../config/db");
 
-const monthlyRateSchema = new mongoose.Schema(
+const MonthlyRate = sequelize.define(
+  "MonthlyRate",
   {
-    month: { type: String, required: true }, // Format: YYYY-MM
-    route: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Route",
-      required: true,
+    // Frontend compatibility ke liye ID
+    _id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
     },
-    shop: { type: mongoose.Schema.Types.ObjectId, ref: "Shop", required: true },
-    rate: { type: Number, required: true },
+    month: {
+      type: DataTypes.STRING, // Format: YYYY-MM
+      allowNull: false,
+    },
+    route: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    shop: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    rate: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+    },
   },
-  { timestamps: true },
+  {
+    timestamps: true,
+    tableName: "monthly_rates",
+
+    // Taake ek dukan ka ek mahinay mein sirf ek hi rate save ho
+    indexes: [
+      {
+        unique: true,
+        fields: ["month", "shop"],
+      },
+    ],
+  },
 );
 
-// Taake ek dukan ka ek mahinay mein sirf ek hi rate save ho
-monthlyRateSchema.index({ month: 1, shop: 1 }, { unique: true });
-
-module.exports = mongoose.model("MonthlyRate", monthlyRateSchema);
+module.exports = MonthlyRate;

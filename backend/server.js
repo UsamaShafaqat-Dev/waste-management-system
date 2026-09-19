@@ -2,7 +2,8 @@ const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-const connectDB = require("./config/db");
+// 🔥 NAYA: Import ka tareeqa thora change kiya hai
+const { connectDB, sequelize } = require("./config/db");
 
 // Load Environment Variables
 dotenv.config();
@@ -69,4 +70,14 @@ app.get("/api/status", (req, res) =>
 // SERVER START
 // ==========================================
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`VIP Server running on port ${PORT}`));
+
+// 🔥 NAYA: Jab humare saare MySQL Models ban jayenge, toh hum yahan database ko sync karenge
+sequelize
+  .sync({ alter: false })
+  .then(() => {
+    console.log("Database synced!");
+    app.listen(PORT, () => console.log(`VIP Server running on port ${PORT}`));
+  })
+  .catch((err) => {
+    console.log("Failed to sync database: " + err.message);
+  });

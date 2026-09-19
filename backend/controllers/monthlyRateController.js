@@ -7,13 +7,21 @@ const getMonthlyRates = async (req, res) => {
     if (!month || !routeId)
       return res.status(400).json({ message: "Month and Route are required" });
 
-    // Route ki tamam active shops nikalen
-    const shops = await Shop.find({
-      assignedRoute: routeId,
-      status: "Active",
-    }).sort({ serialNumber: 1 });
+    // Route ki tamam active shops nikalen (Sequelize order array use karta hai)
+    const shops = await Shop.findAll({
+      where: {
+        assignedRoute: routeId,
+        status: "Active",
+      },
+      order: [["serialNumber", "ASC"]],
+      raw: true, // Plain JavaScript object return karne ke liye
+    });
+
     // Us mahinay ke pehle se saved rates nikalen
-    const rates = await MonthlyRate.find({ month, route: routeId });
+    const rates = await MonthlyRate.findAll({
+      where: { month, route: routeId },
+      raw: true,
+    });
 
     // Dono ko mila kar data tayyar karein
     const data = shops.map((shop) => {
@@ -39,16 +47,20 @@ const saveMonthlyRates = async (req, res) => {
   try {
     const { month, routeId, rates } = req.body;
 
-    // Naye rates ko update ya insert (upsert) karein
-    const bulkOps = rates.map((r) => ({
-      updateOne: {
-        filter: { month, shop: r.shopId },
-        update: { month, route: routeId, shop: r.shopId, rate: r.rate },
-        upsert: true,
-      },
+    // Naye rates ko Sequelize ke format mein map karein
+    const formattedRates = rates.map((r) => ({
+      month,
+      route: routeId,
+      shop: r.shopId,
+      rate: r.rate,
     }));
 
-    await MonthlyRate.bulkWrite(bulkOps);
+    // Mongoose ke bulkWrite (upsert) ki jagah Sequelize ka bulkCreate
+    // updateOnDuplicate MySQL ka special feature hai jo duplicate entry milne par usay update kar deta hai
+    await MonthlyRate.bulkCreate(formattedRates, {
+      updateOnDuplicate: ["rate", "route"],
+    });
+
     res.status(200).json({ message: "Rates saved successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });

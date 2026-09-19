@@ -1,50 +1,61 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const { sequelize } = require("../config/db"); // Aapki database connection file
 
-const dailyCollectionSchema = new mongoose.Schema(
+const DailyCollection = sequelize.define(
+  "DailyCollection",
   {
+    // MySQL mein ID numbers mein hoti hai, is liye Auto Increment lagaya hai
+    // par naam '_id' hi rakha hai taake frontend kharab na ho
+    _id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
     date: {
-      type: Date,
-      required: true,
+      type: DataTypes.DATE,
+      allowNull: false,
     },
     shop: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Shop",
-      required: true,
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
     route: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Route",
-      required: true,
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
     vehicle: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Vehicle",
-      required: true,
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
     weightKg: {
-      type: Number,
-      required: true,
+      type: DataTypes.FLOAT, // Wazan points mein bhi ho sakta hai is liye FLOAT
+      allowNull: false,
     },
-    // 🔥 Puraane Rate aur Amount ko 'required' se hata diya
     ratePerKg: {
-      type: Number,
-      default: 0,
+      type: DataTypes.FLOAT,
+      defaultValue: 0,
     },
     amount: {
-      type: Number,
-      default: 0,
+      type: DataTypes.FLOAT,
+      defaultValue: 0,
     },
     status: {
-      type: String,
-      default: "Collected",
+      type: DataTypes.STRING,
+      defaultValue: "Collected",
     },
   },
   {
-    timestamps: true,
+    timestamps: true, // createdAt aur updatedAt khud ban jayenge
+    tableName: "daily_collections",
+
+    // VIP Feature: Prevent double entry for the same shop on the exact same date
+    indexes: [
+      {
+        unique: true,
+        fields: ["date", "shop"],
+      },
+    ],
   },
 );
 
-// VIP Feature: Prevent double entry for the same shop on the exact same date
-dailyCollectionSchema.index({ date: 1, shop: 1 }, { unique: true });
-
-module.exports = mongoose.model("DailyCollection", dailyCollectionSchema);
+module.exports = DailyCollection;

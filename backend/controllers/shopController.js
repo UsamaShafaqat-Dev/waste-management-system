@@ -1,4 +1,6 @@
+const { Op } = require("sequelize");
 const Shop = require("../models/Shop");
+const Route = require("../models/Route"); // Populate mimic karne ke liye import kiya hai
 
 const createShop = async (req, res) => {
   try {
@@ -7,7 +9,9 @@ const createShop = async (req, res) => {
 
     // 🔥 JADOO: Auto-Increment Serial Number Logic
     // System database mein sab se bara serial number dhoondega
-    const lastShop = await Shop.findOne().sort({ serialNumber: -1 });
+    const lastShop = await Shop.findOne({
+      order: [["serialNumber", "DESC"]], // Sequelize mein descending sort ka tareeqa
+    });
 
     let nextSerialNumber = 10001; // Default start number (agar DB khali ho)
 
@@ -37,9 +41,31 @@ const createShop = async (req, res) => {
 const getShops = async (req, res) => {
   try {
     // Shops ko Serial Number ke hisab se sort kiya gaya hai
-    const shops = await Shop.find()
-      .populate("assignedRoute", "routeName")
-      .sort({ serialNumber: 1 });
+    const rawShops = await Shop.findAll({
+      order: [["serialNumber", "ASC"]],
+      raw: true,
+    });
+
+    // Populate "assignedRoute" ko mimic karne ki logic
+    const routeIds = [
+      ...new Set(
+        rawShops.map((s) => s.assignedRoute).filter((id) => id != null),
+      ),
+    ];
+    const routes = await Route.findAll({
+      where: { _id: { [Op.in]: routeIds } },
+      attributes: ["_id", "routeName"], // Sirf zaroori details
+      raw: true,
+    });
+
+    const shops = rawShops.map((shop) => {
+      const routeObj = routes.find((r) => r._id === shop.assignedRoute);
+      return {
+        ...shop,
+        assignedRoute: routeObj || null,
+      };
+    });
+
     res.status(200).json(shops);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -53,14 +79,19 @@ const updateShop = async (req, res) => {
       delete req.body.serialNumber;
     }
 
-    const shop = await Shop.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    // Sequelize mein findByIdAndUpdate ki jagah
+    const shop = await Shop.findByPk(req.params.id);
 
     if (!shop) {
       return res.status(404).json({ message: "Shop not found" });
     }
+
+    // Dynamic data update
+    Object.keys(req.body).forEach((key) => {
+      shop[key] = req.body[key];
+    });
+    await shop.save();
+
     res.status(200).json(shop);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -69,10 +100,15 @@ const updateShop = async (req, res) => {
 
 const deleteShop = async (req, res) => {
   try {
-    const shop = await Shop.findByIdAndDelete(req.params.id);
+    // Sequelize mein findByIdAndDelete ki jagah
+    const shop = await Shop.findByPk(req.params.id);
+
     if (!shop) {
       return res.status(404).json({ message: "Shop not found" });
     }
+
+    await shop.destroy();
+
     res.status(200).json({ message: "Shop deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });

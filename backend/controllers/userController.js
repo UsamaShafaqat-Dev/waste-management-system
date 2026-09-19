@@ -4,7 +4,9 @@ const User = require("../models/User");
 const createUser = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
-    const userExists = await User.findOne({ email });
+
+    // Sequelize mein where lagana zaroori hai
+    const userExists = await User.findOne({ where: { email } });
     if (userExists) {
       return res
         .status(400)
@@ -18,14 +20,12 @@ const createUser = async (req, res) => {
       role: role || "Staff",
     });
 
-    res
-      .status(201)
-      .json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      });
+    res.status(201).json({
+      _id: user._id, // Sequelize mein humne primary key ka naam _id hi rakha hai
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -34,7 +34,10 @@ const createUser = async (req, res) => {
 // @desc    Get all users
 const getUsers = async (req, res) => {
   try {
-    const users = await User.find({}).select("-password");
+    // Mongoose ke .select("-password") ki jagah Sequelize attributes exclude
+    const users = await User.findAll({
+      attributes: { exclude: ["password"] },
+    });
     res.status(200).json(users);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -50,15 +53,24 @@ const updateUser = async (req, res) => {
       delete req.body.password;
     }
 
-    const user = await User.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    }).select("-password");
+    const user = await User.findByPk(req.params.id);
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.status(200).json(user);
+
+    // Naya data set karein
+    Object.keys(req.body).forEach((key) => {
+      user[key] = req.body[key];
+    });
+
+    await user.save(); // Yeh save chalega toh model mein rakha password hash wala hook khud trigger hoga (agar password change hua hai)
+
+    // Response bhejne se pehle password nikal dein
+    const userData = user.toJSON();
+    delete userData.password;
+
+    res.status(200).json(userData);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -68,10 +80,14 @@ const updateUser = async (req, res) => {
 // @route   DELETE /api/users/:id
 const deleteUser = async (req, res) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
+    const user = await User.findByPk(req.params.id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+
+    // Sequelize mein delete ke liye destroy() use hota hai
+    await user.destroy();
+
     res.status(200).json({ message: "User deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });

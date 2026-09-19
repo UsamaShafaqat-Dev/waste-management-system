@@ -1,9 +1,11 @@
+const { Op } = require("sequelize");
 const DailyCollection = require("../models/DailyCollection");
 const FactoryWeight = require("../models/FactoryWeight");
 const Payment = require("../models/Payment");
 const Shop = require("../models/Shop");
 const Route = require("../models/Route");
 const MonthlyRate = require("../models/MonthlyRate");
+const Vehicle = require("../models/Vehicle"); // Populate ke liye import kiya hai
 
 // @desc    Get Route-Wise Monthly Ledger Summary
 // @route   GET /api/summary/route-ledger?routeId=XYZ&month=8&year=2026
@@ -23,34 +25,63 @@ const getRouteMonthlySummary = async (req, res) => {
     // Format YYYY-MM for MonthlyRate matching
     const monthStr = `${year}-${String(month).padStart(2, "0")}`;
 
-    const routeInfo = await Route.findById(routeId).populate("assignedVehicle");
-    if (!routeInfo) return res.status(404).json({ message: "Route not found" });
+    // Sequelize mein findById ki jagah findByPk aur populate ko mimic karne ke liye manual fetch
+    const routeObj = await Route.findByPk(routeId, { raw: true });
+    if (!routeObj) return res.status(404).json({ message: "Route not found" });
+
+    const vehicleObj = routeObj.assignedVehicle
+      ? await Vehicle.findByPk(routeObj.assignedVehicle, { raw: true })
+      : null;
+
+    const routeInfo = {
+      ...routeObj,
+      assignedVehicle: vehicleObj,
+    };
 
     // 🔥 NAYA: Shops ko serialNumber ke hisab se sort kar ke mangwaya
-    const shops = await Shop.find({
-      assignedRoute: routeId,
-      status: "Active",
-    }).sort({ serialNumber: 1 });
+    const shops = await Shop.findAll({
+      where: {
+        assignedRoute: routeId,
+        status: "Active",
+      },
+      order: [["serialNumber", "ASC"]], // Sequelize Ascending sort
+      raw: true,
+    });
     const shopIds = shops.map((s) => s._id);
 
-    const collections = await DailyCollection.find({
-      route: routeId,
-      date: { $gte: startDate, $lte: endDate },
+    const matchQueryDate = { [Op.between]: [startDate, endDate] };
+
+    const collections = await DailyCollection.findAll({
+      where: {
+        route: routeId,
+        date: matchQueryDate,
+      },
+      raw: true,
     });
 
-    const factoryWeights = await FactoryWeight.find({
-      route: routeId,
-      date: { $gte: startDate, $lte: endDate },
+    const factoryWeights = await FactoryWeight.findAll({
+      where: {
+        route: routeId,
+        date: matchQueryDate,
+      },
+      raw: true,
     });
 
-    const payments = await Payment.find({
-      shop: { $in: shopIds },
-      date: { $gte: startDate, $lte: endDate },
+    // Shop ki array se match karne ke liye Op.in
+    const payments = await Payment.findAll({
+      where: {
+        shop: { [Op.in]: shopIds },
+        date: matchQueryDate,
+      },
+      raw: true,
     });
 
-    const monthlyRates = await MonthlyRate.find({
-      route: routeId,
-      month: monthStr,
+    const monthlyRates = await MonthlyRate.findAll({
+      where: {
+        route: routeId,
+        month: monthStr,
+      },
+      raw: true,
     });
 
     let totalShopKg = 0;

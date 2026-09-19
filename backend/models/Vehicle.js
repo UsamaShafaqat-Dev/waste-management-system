@@ -1,42 +1,47 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const { sequelize } = require("../config/db");
 
-const vehicleSchema = new mongoose.Schema(
+const Vehicle = sequelize.define(
+  "Vehicle",
   {
+    // Frontend compatibility ke liye _id
+    _id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
     vehicleNumber: {
-      type: String,
-      required: [true, "Vehicle number is required"],
+      type: DataTypes.STRING,
+      allowNull: false,
       unique: true,
-      trim: true,
     },
     vehicleName: {
-      type: String,
-      trim: true,
+      type: DataTypes.STRING,
+      allowNull: true,
     },
     driverName: {
-      type: String,
-      required: [true, "Driver name is required"],
-      trim: true,
+      type: DataTypes.STRING,
+      allowNull: false,
     },
     driverContact: {
-      type: String,
-      required: [true, "Driver contact is required"],
-      trim: true,
+      type: DataTypes.STRING,
+      allowNull: false,
     },
-    // We will link this to the Route model later
+    // Linking Vehicle to a specific Route
     assignedRoute: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Route",
-      default: null,
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: null,
     },
     status: {
-      type: String,
-      enum: ["Active", "Inactive"],
-      default: "Active",
+      type: DataTypes.ENUM("Active", "Inactive"),
+      defaultValue: "Active",
     },
   },
   {
     timestamps: true,
+    tableName: "vehicles",
   },
 );
 
-module.exports = mongoose.model("Vehicle", vehicleSchema);
+module.exports = Vehicle;

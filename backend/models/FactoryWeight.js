@@ -1,49 +1,60 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const { sequelize } = require("../config/db"); // Aapki database connection file
 
-const factoryWeightSchema = new mongoose.Schema(
+const FactoryWeight = sequelize.define(
+  "FactoryWeight",
   {
+    // Frontend compatibility ke liye ID ka naam '_id' hi rakha hai
+    _id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
     date: {
-      type: Date,
-      required: true,
+      type: DataTypes.DATE,
+      allowNull: false,
     },
     route: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Route",
-      required: true,
+      type: DataTypes.INTEGER, // MySQL mein ref ID integer hoti hai
+      allowNull: false,
     },
     vehicle: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Vehicle",
-      required: true,
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
     totalShopWeight: {
-      type: Number,
-      required: true,
+      type: DataTypes.FLOAT,
+      allowNull: false,
     },
     factoryWeight: {
-      type: Number,
-      required: true,
+      type: DataTypes.FLOAT,
+      allowNull: false,
     },
     difference: {
-      type: Number,
-      required: true,
+      type: DataTypes.FLOAT,
+      allowNull: false,
     },
     status: {
-      type: String,
-      enum: ["Extra", "Shortage", "Balanced"],
-      required: true,
+      type: DataTypes.ENUM("Extra", "Shortage", "Balanced"), // Enum bilkul Mongoose jaisa kaam karega
+      allowNull: false,
     },
     notes: {
-      type: String,
-      trim: true,
+      type: DataTypes.STRING,
+      allowNull: true,
     },
   },
   {
     timestamps: true,
+    tableName: "factory_weights",
+
+    // VIP Feature: Ek date aur ek route ki factory entry sirf ek baar ho sakti hai
+    indexes: [
+      {
+        unique: true,
+        fields: ["date", "route"],
+      },
+    ],
   },
 );
 
-// VIP Feature: Ek date aur ek route ki factory entry sirf ek baar ho sakti hai
-factoryWeightSchema.index({ date: 1, route: 1 }, { unique: true });
-
-module.exports = mongoose.model("FactoryWeight", factoryWeightSchema);
+module.exports = FactoryWeight;

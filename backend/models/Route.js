@@ -1,28 +1,35 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const { sequelize } = require("../config/db");
 
-const routeSchema = new mongoose.Schema(
+const Route = sequelize.define(
+  "Route",
   {
-    routeName: {
-      type: String,
-      required: [true, "Route name is required"],
-      unique: true,
-      trim: true,
+    // Frontend compatibility ke liye _id
+    _id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
     },
-    // Linking Route to a specific Vehicle
+    routeName: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+    },
+    // Linking Route to a specific Vehicle (Ab MySQL mein ye integer ID hogi)
     assignedVehicle: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Vehicle",
-      default: null,
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: null,
     },
     status: {
-      type: String,
-      enum: ["Active", "Inactive"],
-      default: "Active",
+      type: DataTypes.ENUM("Active", "Inactive"),
+      defaultValue: "Active",
     },
   },
   {
     timestamps: true,
+    tableName: "routes",
   },
 );
 
-module.exports = mongoose.model("Route", routeSchema);
+module.exports = Route;

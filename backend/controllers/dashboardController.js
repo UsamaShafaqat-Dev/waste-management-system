@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+const { Op } = require("sequelize");
+const { sequelize } = require("../config/db"); // Sequelize instance for functions
 const Vehicle = require("../models/Vehicle");
 const Route = require("../models/Route");
 const Shop = require("../models/Shop");
@@ -11,47 +12,42 @@ const getDashboardStats = async (req, res) => {
   try {
     const { date, route } = req.query;
 
-    const totalVehicles = await Vehicle.countDocuments({ status: "Active" });
-    const totalRoutes = await Route.countDocuments({ status: "Active" });
-    const totalShops = await Shop.countDocuments({ status: "Active" });
+    // Mongoose ke countDocuments ki jagah Sequelize ka count()
+    const totalVehicles = await Vehicle.count({ where: { status: "Active" } });
+    const totalRoutes = await Route.count({ where: { status: "Active" } });
+    const totalShops = await Shop.count({ where: { status: "Active" } });
 
     const matchQuery = {};
 
-    // 1. EXACT DATE MATCH LOGIC
+    // 1. EXACT DATE MATCH LOGIC (Sequelize Op.between)
     if (date && date !== "All" && date !== "undefined" && date !== "") {
       const startDate = new Date(`${date}T00:00:00.000Z`);
       const endDate = new Date(`${date}T23:59:59.999Z`);
-      matchQuery.date = { $gte: startDate, $lte: endDate };
+      matchQuery.date = { [Op.between]: [startDate, endDate] };
     }
 
     // 2. ROUTE MATCH LOGIC
     if (route && route !== "All" && route !== "undefined" && route !== "") {
-      if (mongoose.Types.ObjectId.isValid(route)) {
-        matchQuery.route = new mongoose.Types.ObjectId(route);
-      }
+      matchQuery.route = route; // MySQL mein simple integer ID hoti hai
     }
 
-    // 3. Calculate Shop Weight
-    const shopCollections = await DailyCollection.aggregate([
-      { $match: matchQuery },
-      { $group: { _id: null, totalWeight: { $sum: "$weightKg" } } },
-    ]);
+    // 3. Calculate Shop Weight (Sequelize sum function)
     const totalShopWeight =
-      shopCollections.length > 0 ? shopCollections[0].totalWeight : 0;
+      (await DailyCollection.sum("weightKg", { where: matchQuery })) || 0;
 
     // 4. Calculate Factory Weight
-    const factoryCollections = await FactoryWeight.aggregate([
-      { $match: matchQuery },
-      { $group: { _id: null, totalWeight: { $sum: "$factoryWeight" } } },
-    ]);
     const totalFactoryWeight =
-      factoryCollections.length > 0 ? factoryCollections[0].totalWeight : 0;
+      (await FactoryWeight.sum("factoryWeight", { where: matchQuery })) || 0;
 
     // 5. Total Difference (Factory Wgt - Shop Wgt)
     const totalDifference = totalFactoryWeight - totalShopWeight;
 
     // 6. Route-wise Breakdown Logic
-    const allActiveRoutes = await Route.find({ status: "Active" });
+    const allActiveRoutes = await Route.findAll({
+      where: { status: "Active" },
+      raw: true,
+    });
+
     let filteredRoutes = allActiveRoutes;
     if (matchQuery.route) {
       filteredRoutes = allActiveRoutes.filter(
@@ -59,24 +55,40 @@ const getDashboardStats = async (req, res) => {
       );
     }
 
-    const shopByRoute = await DailyCollection.aggregate([
-      { $match: matchQuery },
-      { $group: { _id: "$route", totalWeight: { $sum: "$weightKg" } } },
-    ]);
+    // Group by route for shop weight using Sequelize aggregate
+    const shopByRoute = await DailyCollection.findAll({
+      attributes: [
+        "route",
+        [sequelize.fn("SUM", sequelize.col("weightKg")), "totalWeight"],
+      ],
+      where: matchQuery,
+      group: ["route"],
+      raw: true,
+    });
 
-    const factoryByRoute = await FactoryWeight.aggregate([
-      { $match: matchQuery },
-      { $group: { _id: "$route", totalWeight: { $sum: "$factoryWeight" } } },
-    ]);
+    // Group by route for factory weight using Sequelize aggregate
+    const factoryByRoute = await FactoryWeight.findAll({
+      attributes: [
+        "route",
+        [sequelize.fn("SUM", sequelize.col("factoryWeight")), "totalWeight"],
+      ],
+      where: matchQuery,
+      group: ["route"],
+      raw: true,
+    });
 
     const routeBreakdown = filteredRoutes.map((r) => {
       const rId = r._id.toString();
+
+      const sData = shopByRoute.find((s) => s.route.toString() === rId);
+      const fData = factoryByRoute.find((f) => f.route.toString() === rId);
+
+      // Sequelize grouped sums string bhi return kar dete hain kabhi kabhi, is liye parseFloat lagaya hai
       const sWgt =
-        shopByRoute.find((s) => s._id && s._id.toString() === rId)
-          ?.totalWeight || 0;
+        sData && sData.totalWeight ? parseFloat(sData.totalWeight) : 0;
       const fWgt =
-        factoryByRoute.find((f) => f._id && f._id.toString() === rId)
-          ?.totalWeight || 0;
+        fData && fData.totalWeight ? parseFloat(fData.totalWeight) : 0;
+
       return {
         routeName: r.routeName,
         shopWeight: sWgt,
@@ -85,20 +97,39 @@ const getDashboardStats = async (req, res) => {
       };
     });
 
-    // 🔥 NAYA: Recent Activity (Latest 5 Collections)
-    const recentActivity = await DailyCollection.find(matchQuery)
-      .sort({ _id: -1 }) // Latest pehle
-      .limit(6)
-      .populate("shop", "shopName ownerName")
-      .populate("route", "routeName");
+    // 🔥 NAYA: Recent Activity (Latest 6 Collections)
+    const recentActivity = await DailyCollection.findAll({
+      where: matchQuery,
+      order: [["_id", "DESC"]], // Latest pehle
+      limit: 6,
+      raw: true,
+    });
 
-    const formattedRecentActivity = recentActivity.map((item) => ({
-      id: item._id,
-      shopName: item.shop?.shopName || "Unknown Shop",
-      routeName: item.route?.routeName || "Unknown Route",
-      weightKg: item.weightKg,
-      date: item.date,
-    }));
+    // Manual populate (Associations ke errors se bachne ke liye safe tareeqa)
+    const shopIds = [...new Set(recentActivity.map((item) => item.shop))];
+    const routeIds = [...new Set(recentActivity.map((item) => item.route))];
+
+    const shops = await Shop.findAll({
+      where: { _id: { [Op.in]: shopIds } },
+      raw: true,
+    });
+    const routesList = await Route.findAll({
+      where: { _id: { [Op.in]: routeIds } },
+      raw: true,
+    });
+
+    const formattedRecentActivity = recentActivity.map((item) => {
+      const shop = shops.find((s) => s._id === item.shop);
+      const routeObj = routesList.find((r) => r._id === item.route);
+
+      return {
+        id: item._id,
+        shopName: shop ? shop.shopName : "Unknown Shop",
+        routeName: routeObj ? routeObj.routeName : "Unknown Route",
+        weightKg: item.weightKg,
+        date: item.date,
+      };
+    });
 
     res.status(200).json({
       totalVehicles,
@@ -108,9 +139,10 @@ const getDashboardStats = async (req, res) => {
       totalFactoryWeight,
       totalDifference,
       routeBreakdown,
-      recentActivity: formattedRecentActivity, // 🔥 Naya data frontend ke liye
+      recentActivity: formattedRecentActivity,
     });
   } catch (error) {
+    console.error("Dashboard Stats Error:", error);
     res.status(500).json({ message: error.message });
   }
 };
