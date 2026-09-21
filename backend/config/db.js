@@ -23,7 +23,7 @@ const connectDB = async () => {
     await sequelize.authenticate();
     console.log(`MySQL Connected VIP Style! 🚀 Host: ${process.env.DB_HOST}`);
   } catch (error) {
-    console.error(`MySQL Connection Error: ${error.message}`);
+    console.error("MySQL Connection Error:", error);
     process.exit(1);
   }
 };
