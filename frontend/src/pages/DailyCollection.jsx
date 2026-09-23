@@ -1,4 +1,3 @@
-import React, { useState, useEffect, useContext } from "react";
 import {
   ClipboardList,
   Calendar,
@@ -11,67 +10,122 @@ import toast from "react-hot-toast";
 import api from "../services/api";
 import { LanguageContext } from "../context/LanguageContext";
 
+// Normalize MySQL/Sequelize `id` and older `_id` values for HTML selects.
+const getEntityId = (record) => {
+  const id = record?.id ?? record?._id;
+  return id === undefined || id === null ? "" : String(id);
+};
+
 const DailyCollection = () => {
   const { t, language } = useContext(LanguageContext);
 
   const [routes, setRoutes] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [selectedRoute, setSelectedRoute] = useState("");
-  const [vehicleInfo, setVehicleInfo] = useState(null);
   const [shopEntries, setShopEntries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetchingShops, setFetchingShops] = useState(false);
+  const [loadedRouteId, setLoadedRouteId] = useState("");
+  const [shopsError, setShopsError] = useState("");
+
+  const routeDetail = routes.find(
+    (route) => getEntityId(route) === selectedRoute,
+  );
+  const vehicleInfo = routeDetail?.assignedVehicle || null;
+  const vehicleId = getEntityId(vehicleInfo);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchRoutes = async () => {
       try {
         const { data } = await api.get("/routes");
-        setRoutes(data.filter((r) => r.status === "Active"));
+        if (cancelled) return;
+
+        if (!Array.isArray(data)) {
+          throw new Error("Invalid routes response");
+        }
+
+        const activeRoutes = data.filter((route) => route.status === "Active");
+        if (activeRoutes.some((route) => !getEntityId(route))) {
+          throw new Error("A route is missing its ID");
+        }
+
+        setRoutes(activeRoutes);
       } catch (error) {
-        toast.error("Failed to fetch routes");
+        if (!cancelled) {
+          toast.error(
+            error.response?.data?.message ||
+              error.message ||
+              "Failed to fetch routes",
+          );
+        }
       }
     };
+
     fetchRoutes();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    setShopEntries([]);
+    setLoadedRouteId("");
+    setShopsError("");
+
     if (!selectedRoute) {
-      setShopEntries([]);
-      setVehicleInfo(null);
+      setFetchingShops(false);
       return;
     }
 
     const fetchShopsForRoute = async () => {
       setFetchingShops(true);
       try {
-        const routeDetail = routes.find((r) => r._id === selectedRoute);
-        setVehicleInfo(routeDetail?.assignedVehicle || null);
-
         const { data } = await api.get(
-          `/daily-collections/shops/${selectedRoute}`,
+          `/daily-collections/shops/${encodeURIComponent(selectedRoute)}`,
         );
+        if (cancelled) return;
 
-        // 🔥 VIP JADOO: Sirf Active shops ko filter karein
-        // Jo Inactive dukaanein hain wo ab yahan show nahi hongi!
+        if (!Array.isArray(data)) {
+          throw new Error("Invalid shops response");
+        }
+
         const activeShops = data.filter((shop) => shop.status === "Active");
+        if (activeShops.some((shop) => !getEntityId(shop))) {
+          throw new Error("A shop is missing its ID");
+        }
 
-        const initialEntries = activeShops.map((shop) => ({
-          shopId: shop._id,
-          serialNumber: shop.serialNumber,
-          shopName: shop.shopName,
-          weightKg: "",
-        }));
-
-        setShopEntries(initialEntries);
+        setShopEntries(
+          activeShops.map((shop) => ({
+            shopId: getEntityId(shop),
+            serialNumber: shop.serialNumber,
+            shopName: shop.shopName,
+            weightKg: "",
+          })),
+        );
+        setLoadedRouteId(selectedRoute);
       } catch (error) {
-        toast.error("Failed to fetch shops for this route");
+        if (!cancelled) {
+          const message =
+            error.response?.data?.message ||
+            error.message ||
+            "Failed to fetch shops for this route";
+          setShopsError(message);
+          toast.error(message);
+        }
       } finally {
-        setFetchingShops(false);
+        if (!cancelled) setFetchingShops(false);
       }
     };
 
     fetchShopsForRoute();
-  }, [selectedRoute, routes]);
+    return () => {
+      // Ignore an old request if the user switches to another route.
+      cancelled = true;
+    };
+  }, [selectedRoute]);
 
   const handleWeightChange = (index, value) => {
     const updatedEntries = [...shopEntries];
@@ -101,9 +155,12 @@ const DailyCollection = () => {
   );
 
   const handleSubmit = async () => {
+    if (loading) return;
     if (!selectedRoute || !date)
       return toast.error(t("Please select date and route"));
-    if (!vehicleInfo) return toast.error(t("No Vehicle!"));
+    if (!vehicleId) return toast.error(t("No Vehicle!"));
+    if (fetchingShops || loadedRouteId !== selectedRoute)
+      return toast.error(t("Loading shops..."));
     if (shopEntries.length === 0)
       return toast.error(t("No shops found in this route"));
 
@@ -112,7 +169,7 @@ const DailyCollection = () => {
       const payload = {
         date,
         routeId: selectedRoute,
-        vehicleId: vehicleInfo._id,
+        vehicleId,
         collections: shopEntries.map((entry) => ({
           shopId: entry.shopId,
           weightKg: parseFloat(entry.weightKg) || 0,
@@ -124,7 +181,7 @@ const DailyCollection = () => {
 
       setSelectedRoute("");
       setShopEntries([]);
-      setVehicleInfo(null);
+      setLoadedRouteId("");
     } catch (error) {
       toast.error(error.response?.data?.message || "Error saving collection");
     } finally {
@@ -157,6 +214,7 @@ const DailyCollection = () => {
           </label>
           <input
             type="date"
+            disabled={loading}
             value={date}
             onChange={(e) => setDate(e.target.value)}
             className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500 ${language === "ur" ? "text-right" : ""}`}
@@ -169,13 +227,14 @@ const DailyCollection = () => {
             <Map size={16} /> {t("Select Route")}
           </label>
           <select
+            disabled={loading}
             value={selectedRoute}
             onChange={(e) => setSelectedRoute(e.target.value)}
             className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500 ${language === "ur" ? "text-right" : ""}`}
           >
             <option value="">{t("-- Select Route --")}</option>
             {routes.map((r) => (
-              <option key={r._id} value={r._id}>
+              <option key={getEntityId(r)} value={getEntityId(r)}>
                 {r.routeName}
               </option>
             ))}
@@ -191,8 +250,8 @@ const DailyCollection = () => {
             className={`w-full bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-4 py-2.5 overflow-hidden text-ellipsis whitespace-nowrap ${language === "ur" ? "text-right" : ""}`}
           >
             {selectedRoute ? (
-              vehicleInfo ? (
-                `${vehicleInfo.vehicleNumber} (${vehicleInfo.driverName})`
+              vehicleId ? (
+                `${vehicleInfo.vehicleNumber || "—"}${vehicleInfo.driverName ? ` (${vehicleInfo.driverName})` : ""}`
               ) : (
                 <span className="text-red-500">{t("No Vehicle!")}</span>
               )
@@ -208,6 +267,11 @@ const DailyCollection = () => {
           {fetchingShops ? (
             <div className="p-8 text-center text-gray-500">
               {t("Loading shops...")}
+            </div>
+          ) : shopsError ? (
+            <div className="p-8 text-center text-red-500 flex flex-col items-center gap-2">
+              <AlertCircle size={32} />
+              <p>{t(shopsError)}</p>
             </div>
           ) : shopEntries.length === 0 ? (
             <div className="p-8 text-center text-red-500 flex flex-col items-center gap-2">
@@ -351,8 +415,10 @@ const DailyCollection = () => {
                 <button
                   id="save-collection-btn"
                   onClick={handleSubmit}
-                  disabled={loading}
-                  className={`flex items-center justify-center gap-2 px-6 md:px-8 py-3.5 rounded-lg text-white font-bold transition-all w-full md:w-auto text-lg ${loading ? "bg-green-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700 shadow-md"} ${language === "ur" ? "flex-row-reverse" : ""}`}
+                  disabled={
+                    loading || fetchingShops || loadedRouteId !== selectedRoute
+                  }
+                  className={`flex items-center justify-center gap-2 px-6 md:px-8 py-3.5 rounded-lg text-white font-bold transition-all w-full md:w-auto text-lg ${loading || fetchingShops || loadedRouteId !== selectedRoute ? "bg-green-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700 shadow-md"} ${language === "ur" ? "flex-row-reverse" : ""}`}
                 >
                   <Save size={24} />
                   {loading
