@@ -19,6 +19,17 @@ import { AuthContext } from "../context/AuthContext";
 import { LanguageContext } from "../context/LanguageContext";
 import * as XLSX from "xlsx";
 
+const getEntityId = (record) => {
+  const id =
+    record && typeof record === "object" ? (record.id ?? record._id) : record;
+  return id === undefined || id === null ? "" : String(id);
+};
+
+const getErrorMessage = (error, fallback) => {
+  const message = error.response?.data?.message;
+  return typeof message === "string" && message.trim() ? message : fallback;
+};
+
 const FactoryWeight = () => {
   const { user } = useContext(AuthContext);
   const { t, language } = useContext(LanguageContext);
@@ -34,84 +45,164 @@ const FactoryWeight = () => {
   const [dataFound, setDataFound] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(false);
+  const [collectionError, setCollectionError] = useState("");
+  const [loadedSelection, setLoadedSelection] = useState("");
+  const selectionKey = `${date}|${selectedRoute}`;
 
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [filterMonth, setFilterMonth] = useState(currentMonth);
   const [filterRoute, setFilterRoute] = useState("");
   const [historyData, setHistoryData] = useState([]);
+  const [fetchingHistory, setFetchingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [historyRefresh, setHistoryRefresh] = useState(0);
+  const refreshHistory = () => setHistoryRefresh((version) => version + 1);
 
   const [editModal, setEditModal] = useState({ show: false, data: null });
   const [editWeight, setEditWeight] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
 
   // 🔥 NAYA: Delete Modal aur Loading State
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchRoutes = async () => {
       try {
         const { data } = await api.get("/routes");
-        setRoutes(data.filter((r) => r.status === "Active"));
+        if (cancelled) return;
+        if (!Array.isArray(data)) throw new Error("Invalid routes response");
+        const activeRoutes = data.filter((route) => route.status === "Active");
+        if (activeRoutes.some((route) => !getEntityId(route))) {
+          throw new Error("Missing route ID");
+        }
+        setRoutes(activeRoutes);
       } catch (error) {
-        toast.error("Failed to fetch routes");
+        if (!cancelled)
+          toast.error(getErrorMessage(error, "Failed to fetch routes"));
       }
     };
     fetchRoutes();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const fetchHistory = async () => {
-    try {
-      let url = `/factory-weights?month=${filterMonth}`;
-      if (filterRoute) url += `&routeId=${filterRoute}`;
-
-      const { data } = await api.get(url);
-      setHistoryData(data);
-    } catch (error) {
-      toast.error("Failed to fetch history");
+  useEffect(() => {
+    let cancelled = false;
+    setHistoryData([]);
+    setHistoryError("");
+    if (!filterMonth) {
+      setFetchingHistory(false);
+      return;
     }
-  };
-
-  useEffect(() => {
+    const fetchHistory = async () => {
+      setFetchingHistory(true);
+      try {
+        let url = `/factory-weights?month=${encodeURIComponent(filterMonth)}`;
+        if (filterRoute) url += `&routeId=${encodeURIComponent(filterRoute)}`;
+        const { data } = await api.get(url);
+        if (cancelled) return;
+        if (!Array.isArray(data)) throw new Error("Invalid history response");
+        setHistoryData(data);
+      } catch (error) {
+        if (!cancelled) {
+          setHistoryError(
+            getErrorMessage(
+              error,
+              "Failed to fetch history. Please try again.",
+            ),
+          );
+        }
+      } finally {
+        if (!cancelled) setFetchingHistory(false);
+      }
+    };
     fetchHistory();
-  }, [filterMonth, filterRoute]);
+    return () => {
+      cancelled = true;
+    };
+  }, [filterMonth, filterRoute, historyRefresh]);
 
   useEffect(() => {
+    let cancelled = false;
+    setTotalShopWeight(0);
+    setVehicleInfo(null);
+    setDataFound(false);
+    setLoadedSelection("");
+    setCollectionError("");
+    setFactoryWeight("");
+    setNotes("");
+
     if (!selectedRoute || !date) {
-      setTotalShopWeight(0);
-      setVehicleInfo(null);
-      setDataFound(false);
+      setFetchingData(false);
       return;
     }
     const fetchShopTotal = async () => {
       setFetchingData(true);
       try {
         const { data } = await api.get(
-          `/factory-weights/shop-total?date=${date}&routeId=${selectedRoute}`,
+          `/factory-weights/shop-total?date=${encodeURIComponent(date)}&routeId=${encodeURIComponent(selectedRoute)}`,
         );
-        setTotalShopWeight(data.totalShopWeight);
-        setVehicleInfo(data.vehicle);
+        if (cancelled) return;
+        const rawWeight = data?.totalShopWeight;
+        const total = Number(rawWeight);
+        if (
+          rawWeight === null ||
+          rawWeight === undefined ||
+          !["number", "string"].includes(typeof rawWeight) ||
+          String(rawWeight).trim() === "" ||
+          !Number.isFinite(total) ||
+          total < 0
+        ) {
+          throw new Error("Invalid collection total");
+        }
+        setTotalShopWeight(total);
+        setVehicleInfo(data.vehicle ?? null);
+        setLoadedSelection(`${date}|${selectedRoute}`);
         setDataFound(true);
       } catch (error) {
-        setTotalShopWeight(0);
-        setVehicleInfo(null);
-        setDataFound(false);
-        if (error.response?.status === 404)
-          toast.error("No Daily Collection found!");
+        if (!cancelled) {
+          const fallback =
+            error.response?.status === 404
+              ? "Collection could not be loaded for this date and route."
+              : "Unable to load daily collection. Please try again.";
+          // Preserve the backend's message; a 404 alone does not explain its cause.
+          setCollectionError(getErrorMessage(error, fallback));
+        }
       } finally {
-        setFetchingData(false);
+        if (!cancelled) setFetchingData(false);
       }
     };
     fetchShopTotal();
+    return () => {
+      // An earlier route/date request must not overwrite the current selection.
+      cancelled = true;
+    };
   }, [selectedRoute, date]);
 
-  const parsedFactoryWeight = parseFloat(factoryWeight) || 0;
+  const parsedFactoryWeight = Number(factoryWeight);
   const difference = parsedFactoryWeight - totalShopWeight;
 
   const handleSubmit = async () => {
+    if (loading) return;
+    if (!selectedRoute || !date)
+      return toast.error(t("Please select date and route"));
+    if (fetchingData || loadedSelection !== selectionKey) {
+      return toast.error("Please wait for collection data to load.");
+    }
     if (!dataFound)
       return toast.error("Cannot save! No shop collection data found.");
-    if (!factoryWeight || parsedFactoryWeight <= 0)
+    const vehicleId = getEntityId(vehicleInfo);
+    if (!vehicleId)
+      return toast.error("No vehicle is linked to this collection.");
+    if (
+      !String(factoryWeight).trim() ||
+      !Number.isFinite(parsedFactoryWeight) ||
+      parsedFactoryWeight <= 0
+    )
       return toast.error("Please enter a valid Factory Weight");
 
     setLoading(true);
@@ -119,7 +210,7 @@ const FactoryWeight = () => {
       await api.post("/factory-weights", {
         date,
         route: selectedRoute,
-        vehicle: vehicleInfo._id,
+        vehicle: vehicleId,
         totalShopWeight,
         factoryWeight: parsedFactoryWeight,
         notes,
@@ -130,7 +221,9 @@ const FactoryWeight = () => {
       setNotes("");
       setTotalShopWeight(0);
       setDataFound(false);
-      fetchHistory();
+      setVehicleInfo(null);
+      setLoadedSelection("");
+      refreshHistory();
     } catch (error) {
       toast.error(error.response?.data?.message || "Error saving weight");
     } finally {
@@ -139,27 +232,42 @@ const FactoryWeight = () => {
   };
 
   const handleEditSubmit = async () => {
-    if (!editWeight) return toast.error("Weight is required");
+    if (isEditing) return;
+    const recordId = getEntityId(editModal.data);
+    const weight = Number(editWeight);
+    if (!recordId)
+      return toast.error("Record ID is missing. Please reload the report.");
+    if (!String(editWeight).trim() || !Number.isFinite(weight) || weight <= 0) {
+      return toast.error("Please enter a valid Factory Weight");
+    }
+    setIsEditing(true);
     try {
-      await api.put(`/factory-weights/${editModal.data._id}`, {
-        factoryWeight: parseFloat(editWeight),
+      await api.put(`/factory-weights/${encodeURIComponent(recordId)}`, {
+        factoryWeight: weight,
         notes: editNotes,
       });
       toast.success("Record Updated!");
       setEditModal({ show: false, data: null });
-      fetchHistory();
+      refreshHistory();
     } catch (error) {
-      toast.error("Failed to update record");
+      toast.error(getErrorMessage(error, "Failed to update record"));
+    } finally {
+      setIsEditing(false);
     }
   };
 
   // 🔥 NAYA: Delete Logic with loading spinner lock
   const executeDelete = async () => {
+    if (isDeleting) return;
+    if (!deleteModal.id)
+      return toast.error("Record ID is missing. Please reload the report.");
     setIsDeleting(true);
     try {
-      await api.delete(`/factory-weights/${deleteModal.id}`);
+      await api.delete(
+        `/factory-weights/${encodeURIComponent(deleteModal.id)}`,
+      );
       toast.success(t("Record deleted successfully!"));
-      fetchHistory();
+      refreshHistory();
     } catch (error) {
       toast.error(error.response?.data?.message || t("Error deleting record"));
     } finally {
@@ -169,6 +277,8 @@ const FactoryWeight = () => {
   };
 
   const exportToExcel = () => {
+    if (fetchingHistory || historyError)
+      return toast.error("Please load the report before downloading.");
     if (historyData.length === 0) {
       return toast.error("No data available to download for this month!");
     }
@@ -217,6 +327,7 @@ const FactoryWeight = () => {
             </label>
             <input
               type="date"
+              disabled={loading}
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className={`w-full border rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-teal-500 ${language === "ur" ? "text-right" : ""}`}
@@ -230,12 +341,13 @@ const FactoryWeight = () => {
             </label>
             <select
               value={selectedRoute}
+              disabled={loading}
               onChange={(e) => setSelectedRoute(e.target.value)}
               className={`w-full border rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-teal-500 ${language === "ur" ? "text-right" : ""}`}
             >
               <option value="">{t("-- Select Route --")}</option>
               {routes.map((r) => (
-                <option key={r._id} value={r._id}>
+                <option key={getEntityId(r)} value={getEntityId(r)}>
                   {r.routeName}
                 </option>
               ))}
@@ -252,10 +364,17 @@ const FactoryWeight = () => {
             ) : !dataFound ? (
               <div className="text-center py-4 text-red-500 flex flex-col items-center">
                 <AlertCircle size={24} />{" "}
-                {t("No collection found for this date.")}
+                {t(collectionError || "No collection found for this date.")}
               </div>
             ) : (
               <div className="space-y-6 border-t pt-4">
+                {!getEntityId(vehicleInfo) && (
+                  <p className="text-red-600 text-sm" role="alert">
+                    {t(
+                      "No vehicle is linked to this collection. Please check its route assignment.",
+                    )}
+                  </p>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
                     <p className="text-sm text-gray-500">
@@ -277,6 +396,7 @@ const FactoryWeight = () => {
                         min="0"
                         step="any"
                         value={factoryWeight}
+                        disabled={loading}
                         onChange={(e) => setFactoryWeight(e.target.value)}
                         className={`w-32 text-center text-2xl font-bold border rounded-lg px-2 py-1 outline-none bg-white ${language === "ur" ? "text-right" : ""}`}
                         placeholder="0"
@@ -308,6 +428,7 @@ const FactoryWeight = () => {
                     <input
                       type="text"
                       value={notes}
+                      disabled={loading}
                       onChange={(e) => setNotes(e.target.value)}
                       className={`w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-teal-500 ${language === "ur" ? "text-right" : ""}`}
                       placeholder={t("Notes")}
@@ -315,7 +436,13 @@ const FactoryWeight = () => {
                   </div>
                   <button
                     onClick={handleSubmit}
-                    disabled={loading || !factoryWeight}
+                    disabled={
+                      loading ||
+                      fetchingData ||
+                      loadedSelection !== selectionKey ||
+                      !getEntityId(vehicleInfo) ||
+                      !factoryWeight
+                    }
                     className="bg-teal-600 text-white px-8 py-2.5 rounded-lg font-medium hover:bg-teal-700 w-full md:w-auto flex items-center justify-center gap-2"
                   >
                     <Save size={18} />{" "}
@@ -348,7 +475,7 @@ const FactoryWeight = () => {
             >
               <option value="">{t("All Routes")}</option>
               {routes.map((r) => (
-                <option key={r._id} value={r._id}>
+                <option key={getEntityId(r)} value={getEntityId(r)}>
                   {r.routeName}
                 </option>
               ))}
@@ -362,6 +489,11 @@ const FactoryWeight = () => {
             />
             <button
               onClick={exportToExcel}
+              disabled={
+                fetchingHistory ||
+                Boolean(historyError) ||
+                historyData.length === 0
+              }
               className={`bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all w-full md:w-auto ${language === "ur" ? "flex-row-reverse" : ""}`}
             >
               <Download size={16} /> {t("Excel File")}
@@ -412,7 +544,16 @@ const FactoryWeight = () => {
               </tr>
             </thead>
             <tbody>
-              {historyData.length === 0 ? (
+              {fetchingHistory || historyError ? (
+                <tr>
+                  <td
+                    colSpan={user?.role === "Admin" ? 8 : 7}
+                    className={`text-center py-6 ${historyError ? "text-red-600" : "text-gray-500"}`}
+                  >
+                    {t(historyError || "Loading...")}
+                  </td>
+                </tr>
+              ) : historyData.length === 0 ? (
                 <tr>
                   <td
                     colSpan={user?.role === "Admin" ? 8 : 7}
@@ -424,7 +565,7 @@ const FactoryWeight = () => {
               ) : (
                 historyData.map((row, index) => (
                   <tr
-                    key={row._id}
+                    key={getEntityId(row) || index}
                     className="border-b hover:bg-gray-50 text-sm"
                   >
                     <td className="px-4 py-3 text-center font-bold text-gray-500">
@@ -488,7 +629,10 @@ const FactoryWeight = () => {
                           {/* 🔥 NAYA: Delete Button */}
                           <button
                             onClick={() =>
-                              setDeleteModal({ show: true, id: row._id })
+                              setDeleteModal({
+                                show: true,
+                                id: getEntityId(row),
+                              })
                             }
                             className="text-red-600 hover:bg-red-50 p-1.5 rounded transition"
                             title={t("Delete")}
@@ -515,6 +659,7 @@ const FactoryWeight = () => {
               <h3 className="font-bold text-lg">{t("Edit Factory Weight")}</h3>
               <button
                 onClick={() => setEditModal({ show: false, data: null })}
+                disabled={isEditing}
                 className="text-gray-500 hover:text-red-500"
               >
                 <X size={20} />
@@ -539,6 +684,8 @@ const FactoryWeight = () => {
                   type="number"
                   step="any"
                   value={editWeight}
+                  min="0"
+                  disabled={isEditing}
                   onChange={(e) => setEditWeight(e.target.value)}
                   className={`w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-teal-500 ${language === "ur" ? "text-right" : ""}`}
                 />
@@ -552,15 +699,17 @@ const FactoryWeight = () => {
                 <input
                   type="text"
                   value={editNotes}
+                  disabled={isEditing}
                   onChange={(e) => setEditNotes(e.target.value)}
                   className={`w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-teal-500 ${language === "ur" ? "text-right" : ""}`}
                 />
               </div>
               <button
                 onClick={handleEditSubmit}
+                disabled={isEditing}
                 className="w-full bg-teal-600 text-white py-2.5 rounded-lg font-medium hover:bg-teal-700 mt-2"
               >
-                {t("Update Record")}
+                {isEditing ? t("Saving...") : t("Update Record")}
               </button>
             </div>
           </div>
