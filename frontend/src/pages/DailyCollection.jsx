@@ -70,13 +70,14 @@ const DailyCollection = () => {
     };
   }, []);
 
+  // 🔥 NAYA: Dependency array mein 'date' add kiya gaya hai
   useEffect(() => {
     let cancelled = false;
     setShopEntries([]);
     setLoadedRouteId("");
     setShopsError("");
 
-    if (!selectedRoute) {
+    if (!selectedRoute || !date) {
       setFetchingShops(false);
       return;
     }
@@ -84,8 +85,9 @@ const DailyCollection = () => {
     const fetchShopsForRoute = async () => {
       setFetchingShops(true);
       try {
+        // 🔥 NAYA: API call mein date pass ki gayi hai
         const { data } = await api.get(
-          `/daily-collections/shops/${encodeURIComponent(selectedRoute)}`,
+          `/daily-collections/shops/${encodeURIComponent(selectedRoute)}?date=${date}`,
         );
         if (cancelled) return;
 
@@ -103,7 +105,11 @@ const DailyCollection = () => {
             shopId: getEntityId(shop),
             serialNumber: shop.serialNumber,
             shopName: shop.shopName,
-            weightKg: "",
+            // 🔥 NAYA: Agar backend se pehle ka wazan (weightKg) aaye, toh usay set karein warna khali chorain
+            weightKg:
+              shop.weightKg !== undefined && shop.weightKg !== null
+                ? shop.weightKg
+                : "",
           })),
         );
         setLoadedRouteId(selectedRoute);
@@ -123,10 +129,9 @@ const DailyCollection = () => {
 
     fetchShopsForRoute();
     return () => {
-      // Ignore an old request if the user switches to another route.
       cancelled = true;
     };
-  }, [selectedRoute]);
+  }, [selectedRoute, date]); // 🔥 NAYA: Jab date change hogi toh yeh function dobara chalega
 
   const handleWeightChange = (index, value) => {
     const updatedEntries = [...shopEntries];
@@ -134,8 +139,9 @@ const DailyCollection = () => {
     setShopEntries(updatedEntries);
   };
 
+  // 🔥 NAYA: ArrowUp aur ArrowDown ki logic shamil ki gayi hai
   const handleKeyDown = (e, index) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" || e.key === "ArrowDown") {
       e.preventDefault();
       let nextInput = document.getElementById(`weight-input-${index + 1}`);
       if (!nextInput) {
@@ -144,8 +150,20 @@ const DailyCollection = () => {
 
       if (nextInput) {
         nextInput.focus();
-      } else {
+        nextInput.select(); // Input select karne se user direct type karega toh purana wazan replace ho jayega
+      } else if (e.key === "Enter") {
         document.getElementById("save-collection-btn")?.focus();
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      let prevInput = document.getElementById(`weight-input-${index - 1}`);
+      if (!prevInput) {
+        prevInput = document.getElementById(`weight-input-mobile-${index - 1}`);
+      }
+
+      if (prevInput) {
+        prevInput.focus();
+        prevInput.select();
       }
     }
   };
@@ -180,9 +198,10 @@ const DailyCollection = () => {
       await api.post("/daily-collections", payload);
       toast.success(t("Save Daily Collection"));
 
-      setSelectedRoute("");
-      setShopEntries([]);
-      setLoadedRouteId("");
+      // Agar same route aur date pe aur collection karni hai toh values reset na karein ya zaroorat ke mutabiq manage karein
+      // setSelectedRoute("");
+      // setShopEntries([]);
+      // setLoadedRouteId("");
     } catch (error) {
       toast.error(error.response?.data?.message || "Error saving collection");
     } finally {
@@ -225,7 +244,8 @@ const DailyCollection = () => {
           <label
             className={`block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
           >
-            <Map size={16} /> {t("Select Route")}
+            <Map size={16} />
+            {t("Select Route")}
           </label>
           <select
             disabled={loading}
