@@ -76,7 +76,7 @@ const DailyCollection = () => {
     setShopEntries([]);
     setLoadedRouteId("");
     setShopsError("");
-    setFactoryWeight(""); // Route/Date change hone par factory weight clear kar do
+    setFactoryWeight("");
 
     if (!selectedRoute || !date) {
       setFetchingShops(false);
@@ -112,8 +112,11 @@ const DailyCollection = () => {
           })),
         );
 
-        // Agar pehle se factory weight is din ka save hai toh backend bhej raha ho ga (Optional logic k liye future proofing)
-        if (data.length > 0 && data[0].factoryWeightKg !== undefined) {
+        if (
+          data.length > 0 &&
+          data[0].factoryWeightKg !== undefined &&
+          data[0].factoryWeightKg !== ""
+        ) {
           setFactoryWeight(data[0].factoryWeightKg);
         }
 
@@ -156,7 +159,6 @@ const DailyCollection = () => {
         nextInput.focus();
         nextInput.select();
       } else {
-        // Agar aakhri shop hai toh factory weight par chala jaye
         document.getElementById("factory-weight-input")?.focus();
       }
     } else if (e.key === "ArrowUp") {
@@ -476,7 +478,7 @@ const DailyCollection = () => {
                       onChange={(e) => setFactoryWeight(e.target.value)}
                       onKeyDown={handleFactoryWeightKeyDown}
                       className={`w-full md:w-64 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 px-4 py-3 outline-none text-2xl font-black text-blue-800 bg-white shadow-inner ${language === "ur" ? "text-right" : "text-left"}`}
-                      placeholder="Enter factory weight"
+                      placeholder="0"
                     />
                   </div>
                 </div>
