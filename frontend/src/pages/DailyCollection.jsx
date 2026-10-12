@@ -28,7 +28,7 @@ const DailyCollection = () => {
   const [fetchingShops, setFetchingShops] = useState(false);
   const [loadedRouteId, setLoadedRouteId] = useState("");
   const [shopsError, setShopsError] = useState("");
-  const [factoryWeight, setFactoryWeight] = useState(""); // Factory Weight State
+  const [factoryWeight, setFactoryWeight] = useState("");
 
   const routeDetail = routes.find(
     (route) => getEntityId(route) === selectedRoute,
@@ -49,10 +49,6 @@ const DailyCollection = () => {
         }
 
         const activeRoutes = data.filter((route) => route.status === "Active");
-        if (activeRoutes.some((route) => !getEntityId(route))) {
-          throw new Error("A route is missing its ID");
-        }
-
         setRoutes(activeRoutes);
       } catch (error) {
         if (!cancelled) {
@@ -96,9 +92,6 @@ const DailyCollection = () => {
         }
 
         const activeShops = data.filter((shop) => shop.status === "Active");
-        if (activeShops.some((shop) => !getEntityId(shop))) {
-          throw new Error("A shop is missing its ID");
-        }
 
         setShopEntries(
           activeShops.map((shop) => ({
@@ -200,6 +193,26 @@ const DailyCollection = () => {
     (sum, item) => sum + (parseFloat(item.weightKg) || 0),
     0,
   );
+
+  // 🔥 Live Difference Calculator
+  const getDifferenceStatus = () => {
+    if (factoryWeight === "" || factoryWeight === null) return null;
+    const fWeight = parseFloat(factoryWeight) || 0;
+    const difference = fWeight - totalWeight;
+
+    if (difference > 0)
+      return {
+        text: `+${difference.toFixed(2)} KG (Extra)`,
+        color: "text-blue-600",
+      };
+    if (difference < 0)
+      return {
+        text: `${difference.toFixed(2)} KG (Shortage)`,
+        color: "text-red-600",
+      };
+    return { text: "0 KG (Balanced)", color: "text-green-600" };
+  };
+  const diffStatus = getDifferenceStatus();
 
   const handleSubmit = async () => {
     if (loading) return;
@@ -458,9 +471,9 @@ const DailyCollection = () => {
                 </div>
               </div>
 
-              {/* FACTORY WEIGHT INPUT */}
+              {/* FACTORY WEIGHT INPUT & DIFFERENCE */}
               <div className="px-4 md:px-6 mt-4">
-                <div className="bg-blue-50 rounded-xl p-5 shadow-sm border border-blue-200">
+                <div className="bg-blue-50 rounded-xl p-5 shadow-sm border border-blue-200 space-y-4">
                   <div
                     className={`flex flex-col md:flex-row justify-between md:items-center gap-4 ${language === "ur" ? "md:flex-row-reverse" : ""}`}
                   >
@@ -481,6 +494,22 @@ const DailyCollection = () => {
                       placeholder="0"
                     />
                   </div>
+
+                  {/* 🔥 LIVE SHORTAGE/EXTRA STATUS */}
+                  {diffStatus && (
+                    <div
+                      className={`flex justify-between items-center pt-3 border-t border-blue-200 ${language === "ur" ? "flex-row-reverse" : ""}`}
+                    >
+                      <span className="font-medium text-gray-700 text-lg">
+                        {t("Status (Shortage / Extra):")}
+                      </span>
+                      <span
+                        className={`font-black text-2xl ${diffStatus.color}`}
+                      >
+                        {diffStatus.text}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
