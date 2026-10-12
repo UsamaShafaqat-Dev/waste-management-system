@@ -28,6 +28,7 @@ const DailyCollection = () => {
   const [fetchingShops, setFetchingShops] = useState(false);
   const [loadedRouteId, setLoadedRouteId] = useState("");
   const [shopsError, setShopsError] = useState("");
+  const [factoryWeight, setFactoryWeight] = useState(""); // Factory Weight State
 
   const routeDetail = routes.find(
     (route) => getEntityId(route) === selectedRoute,
@@ -70,12 +71,12 @@ const DailyCollection = () => {
     };
   }, []);
 
-  // 🔥 NAYA: Dependency array mein 'date' add kiya gaya hai
   useEffect(() => {
     let cancelled = false;
     setShopEntries([]);
     setLoadedRouteId("");
     setShopsError("");
+    setFactoryWeight(""); // Route/Date change hone par factory weight clear kar do
 
     if (!selectedRoute || !date) {
       setFetchingShops(false);
@@ -85,7 +86,6 @@ const DailyCollection = () => {
     const fetchShopsForRoute = async () => {
       setFetchingShops(true);
       try {
-        // 🔥 NAYA: API call mein date pass ki gayi hai
         const { data } = await api.get(
           `/daily-collections/shops/${encodeURIComponent(selectedRoute)}?date=${date}`,
         );
@@ -105,13 +105,18 @@ const DailyCollection = () => {
             shopId: getEntityId(shop),
             serialNumber: shop.serialNumber,
             shopName: shop.shopName,
-            // 🔥 NAYA: Agar backend se pehle ka wazan (weightKg) aaye, toh usay set karein warna khali chorain
             weightKg:
               shop.weightKg !== undefined && shop.weightKg !== null
                 ? shop.weightKg
                 : "",
           })),
         );
+
+        // Agar pehle se factory weight is din ka save hai toh backend bhej raha ho ga (Optional logic k liye future proofing)
+        if (data.length > 0 && data[0].factoryWeightKg !== undefined) {
+          setFactoryWeight(data[0].factoryWeightKg);
+        }
+
         setLoadedRouteId(selectedRoute);
       } catch (error) {
         if (!cancelled) {
@@ -131,7 +136,7 @@ const DailyCollection = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedRoute, date]); // 🔥 NAYA: Jab date change hogi toh yeh function dobara chalega
+  }, [selectedRoute, date]);
 
   const handleWeightChange = (index, value) => {
     const updatedEntries = [...shopEntries];
@@ -139,7 +144,6 @@ const DailyCollection = () => {
     setShopEntries(updatedEntries);
   };
 
-  // 🔥 NAYA: ArrowUp aur ArrowDown ki logic shamil ki gayi hai
   const handleKeyDown = (e, index) => {
     if (e.key === "Enter" || e.key === "ArrowDown") {
       e.preventDefault();
@@ -150,9 +154,10 @@ const DailyCollection = () => {
 
       if (nextInput) {
         nextInput.focus();
-        nextInput.select(); // Input select karne se user direct type karega toh purana wazan replace ho jayega
-      } else if (e.key === "Enter") {
-        document.getElementById("save-collection-btn")?.focus();
+        nextInput.select();
+      } else {
+        // Agar aakhri shop hai toh factory weight par chala jaye
+        document.getElementById("factory-weight-input")?.focus();
       }
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
@@ -161,6 +166,27 @@ const DailyCollection = () => {
         prevInput = document.getElementById(`weight-input-mobile-${index - 1}`);
       }
 
+      if (prevInput) {
+        prevInput.focus();
+        prevInput.select();
+      }
+    }
+  };
+
+  const handleFactoryWeightKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      document.getElementById("save-collection-btn")?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      let prevInput = document.getElementById(
+        `weight-input-${shopEntries.length - 1}`,
+      );
+      if (!prevInput) {
+        prevInput = document.getElementById(
+          `weight-input-mobile-${shopEntries.length - 1}`,
+        );
+      }
       if (prevInput) {
         prevInput.focus();
         prevInput.select();
@@ -183,6 +209,10 @@ const DailyCollection = () => {
     if (shopEntries.length === 0)
       return toast.error(t("No shops found in this route"));
 
+    if (factoryWeight === "" || factoryWeight === null) {
+      return toast.error(t("Please enter Factory Weight before saving."));
+    }
+
     setLoading(true);
     try {
       const payload = {
@@ -193,15 +223,11 @@ const DailyCollection = () => {
           shopId: entry.shopId,
           weightKg: parseFloat(entry.weightKg) || 0,
         })),
+        factoryWeight: parseFloat(factoryWeight) || 0,
       };
 
       await api.post("/daily-collections", payload);
-      toast.success(t("Save Daily Collection"));
-
-      // Agar same route aur date pe aur collection karni hai toh values reset na karein ya zaroorat ke mutabiq manage karein
-      // setSelectedRoute("");
-      // setShopEntries([]);
-      // setLoadedRouteId("");
+      toast.success(t("Daily Collection & Factory Weight Saved Successfully!"));
     } catch (error) {
       toast.error(error.response?.data?.message || "Error saving collection");
     } finally {
@@ -430,8 +456,34 @@ const DailyCollection = () => {
                 </div>
               </div>
 
+              {/* FACTORY WEIGHT INPUT */}
+              <div className="px-4 md:px-6 mt-4">
+                <div className="bg-blue-50 rounded-xl p-5 shadow-sm border border-blue-200">
+                  <div
+                    className={`flex flex-col md:flex-row justify-between md:items-center gap-4 ${language === "ur" ? "md:flex-row-reverse" : ""}`}
+                  >
+                    <label
+                      className={`font-bold text-gray-800 text-xl flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
+                    >
+                      {t("Factory Weight (KG):")}
+                    </label>
+                    <input
+                      id="factory-weight-input"
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={factoryWeight}
+                      onChange={(e) => setFactoryWeight(e.target.value)}
+                      onKeyDown={handleFactoryWeightKeyDown}
+                      className={`w-full md:w-64 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 px-4 py-3 outline-none text-2xl font-black text-blue-800 bg-white shadow-inner ${language === "ur" ? "text-right" : "text-left"}`}
+                      placeholder="Enter factory weight"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div
-                className={`p-4 md:p-6 bg-gray-50 flex border-t border-gray-200 ${language === "ur" ? "justify-start" : "justify-end"}`}
+                className={`p-4 md:p-6 bg-gray-50 flex border-t border-gray-200 mt-6 ${language === "ur" ? "justify-start" : "justify-end"}`}
               >
                 <button
                   id="save-collection-btn"
@@ -439,12 +491,12 @@ const DailyCollection = () => {
                   disabled={
                     loading || fetchingShops || loadedRouteId !== selectedRoute
                   }
-                  className={`flex items-center justify-center gap-2 px-6 md:px-8 py-3.5 rounded-lg text-white font-bold transition-all w-full md:w-auto text-lg ${loading || fetchingShops || loadedRouteId !== selectedRoute ? "bg-green-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700 shadow-md"} ${language === "ur" ? "flex-row-reverse" : ""}`}
+                  className={`flex items-center justify-center gap-2 px-6 md:px-8 py-4 rounded-lg text-white font-bold transition-all w-full md:w-auto text-xl ${loading || fetchingShops || loadedRouteId !== selectedRoute ? "bg-green-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700 shadow-md"} ${language === "ur" ? "flex-row-reverse" : ""}`}
                 >
                   <Save size={24} />
                   {loading
-                    ? t("Saving Collection...")
-                    : t("Save Daily Collection")}
+                    ? t("Saving Data...")
+                    : t("Save Collection & Factory Weight")}
                 </button>
               </div>
             </>
