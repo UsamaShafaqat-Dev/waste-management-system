@@ -1,22 +1,26 @@
 const DailyCollection = require("../models/DailyCollection");
 const Shop = require("../models/Shop");
+const FactoryWeight = require("../models/FactoryWeight"); // Factory Weight ko import karna zaroori hai
 const { Op } = require("sequelize");
 
-// @desc    Save or Update daily collection for a route
+// @desc    Save or Update daily collection AND Factory Weight for a route
 // @route   POST /api/daily-collections
 const createDailyCollection = async (req, res) => {
   try {
-    const { date, routeId, vehicleId, collections } = req.body;
+    const { date, routeId, vehicleId, collections, factoryWeight } = req.body;
 
-    // Set time to start of the day for consistent checking
     const collectionDate = new Date(date);
     collectionDate.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // 🔥 NAYA: Ab hum error nahi denge, balke loop chala kar check karenge.
-    // Agar entry pehle se mojood hai toh 'Update' karenge, nahi toh 'Nayi Create' karenge.
+    let totalShopWeight = 0;
+
+    // 1. Dukaano ki wasooli save/update karein
     for (let item of collections) {
+      const weight = item.weightKg || 0;
+      totalShopWeight += weight;
+
       const existingEntry = await DailyCollection.findOne({
         where: {
           route: routeId,
@@ -28,57 +32,96 @@ const createDailyCollection = async (req, res) => {
       });
 
       if (existingEntry) {
-        // Agar pehle se wazan mojood hai toh naya wazan update kar do
-        existingEntry.weightKg = item.weightKg || 0;
+        existingEntry.weightKg = weight;
         existingEntry.vehicle = vehicleId;
         await existingEntry.save();
       } else {
-        // Agar pehle se nahi hai toh naya record bana do
         await DailyCollection.create({
           date: collectionDate,
           route: routeId,
           vehicle: vehicleId,
           shop: item.shopId,
-          weightKg: item.weightKg || 0,
+          weightKg: weight,
           ratePerKg: 0,
           amount: 0,
         });
       }
     }
 
+    // 2. Factory Weight save/update karein
+    if (factoryWeight !== undefined && factoryWeight !== null) {
+      const existingFactoryEntry = await FactoryWeight.findOne({
+        where: {
+          route: routeId,
+          date: { [Op.between]: [collectionDate, endOfDay] },
+        },
+      });
+
+      const parsedFactoryWeight = parseFloat(factoryWeight) || 0;
+      const difference = parsedFactoryWeight - totalShopWeight;
+      let status = "Balanced";
+
+      if (difference > 0) status = "Extra";
+      if (difference < 0) status = "Shortage";
+
+      if (existingFactoryEntry) {
+        // Agar factory weight ki entry pehle se hai toh update karein
+        existingFactoryEntry.totalShopWeight = totalShopWeight;
+        existingFactoryEntry.factoryWeight = parsedFactoryWeight;
+        existingFactoryEntry.difference = difference;
+        existingFactoryEntry.status = status;
+        await existingFactoryEntry.save();
+      } else {
+        // Agar nahi hai toh nayi create karein
+        await FactoryWeight.create({
+          date: collectionDate,
+          route: routeId,
+          vehicle: vehicleId,
+          totalShopWeight: totalShopWeight,
+          factoryWeight: parsedFactoryWeight,
+          difference: difference,
+          status: status,
+          notes: "Auto-saved from Daily Collection Form",
+        });
+      }
+    }
+
     res
       .status(200)
-      .json({ message: "Daily Collection Saved/Updated Successfully!" });
+      .json({
+        message: "Daily Collection & Factory Weight Saved Successfully!",
+      });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// @desc    Get shops by route ID for the form dropdowns (With previous weight if exists)
+// @desc    Get shops by route ID for the form dropdowns (With previous weights)
 // @route   GET /api/daily-collections/shops/:routeId
 const getShopsByRoute = async (req, res) => {
   try {
     const { routeId } = req.params;
-    const { date } = req.query; // Frontend se aane wali date
+    const { date } = req.query;
 
-    // 1. Sab active dukaanein nikalo aur Serial Number ki tarteeb (Ascending) se lagao
+    // Dukanein Serial Number ki tarteeb se nikalen
     const shops = await Shop.findAll({
       where: {
         assignedRoute: routeId,
         status: "Active",
       },
-      order: [["serialNumber", "ASC"]], // 🔥 NAYA: Point 2 (Serial number wali tarteeb) fix ho gayi
+      order: [["serialNumber", "ASC"]],
     });
 
     let collectionsMap = {};
+    let factoryWeightKg = "";
 
-    // 2. Agar date aayi hai, toh us din ka pehle se save shuda wazan database se nikalo
     if (date) {
       const collectionDate = new Date(date);
       collectionDate.setHours(0, 0, 0, 0);
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
+      // Purani Collection Nikalen
       const existingCollections = await DailyCollection.findAll({
         where: {
           route: routeId,
@@ -88,22 +131,39 @@ const getShopsByRoute = async (req, res) => {
         },
       });
 
-      // Shop id ke hisaab se wazan ko map kar lo
       existingCollections.forEach((col) => {
-        const sId = col.shop || col.shopId; // Foreign key check
+        const sId = col.shop || col.shopId;
         collectionsMap[sId] = col.weightKg;
       });
+
+      // Purana Factory Weight nikalen taake frontend pe dikhaya ja sake
+      const existingFactoryWeight = await FactoryWeight.findOne({
+        where: {
+          route: routeId,
+          date: {
+            [Op.between]: [collectionDate, endOfDay],
+          },
+        },
+      });
+      if (existingFactoryWeight) {
+        factoryWeightKg = existingFactoryWeight.factoryWeight;
+      }
     }
 
-    // 3. Dukaanon ke data ke sath purana wazan attach kar do
-    const mergedShops = shops.map((shop) => {
-      const shopObj = shop.toJSON(); // Sequelize object ko normal object banaya
+    // Dukaanon k data me purana wazan aur factory weight shamil kar den
+    const mergedShops = shops.map((shop, index) => {
+      const shopObj = shop.toJSON();
       const sId = shopObj.id || shopObj._id;
 
-      // Agar is dukaan ka wazan is date par mojood hai toh frontend ko bhej do
       if (collectionsMap[sId] !== undefined) {
         shopObj.weightKg = collectionsMap[sId];
       }
+
+      // Pehli dukaan k object me factory weight bhej den (frontend handle kar lega)
+      if (index === 0) {
+        shopObj.factoryWeightKg = factoryWeightKg;
+      }
+
       return shopObj;
     });
 
