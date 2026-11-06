@@ -1,24 +1,21 @@
 const { Op } = require("sequelize");
 const Shop = require("../models/Shop");
-const Route = require("../models/Route"); // Populate mimic karne ke liye import kiya hai
+const Route = require("../models/Route");
 
 const createShop = async (req, res) => {
   try {
     const { shopName, ownerName, contact, address, assignedRoute, status } =
       req.body;
 
-    // 🔥 JADOO: Auto-Increment Serial Number Logic
-    // System database mein sab se bara serial number dhoondega
     const lastShop = await Shop.findOne({
-      order: [["serialNumber", "DESC"]], // Sequelize mein descending sort ka tareeqa
+      order: [["serialNumber", "DESC"]],
     });
 
-    let nextSerialNumber = 10001; // Default start number (agar DB khali ho)
+    let nextSerialNumber = 10001;
 
     if (lastShop && lastShop.serialNumber >= 10001) {
-      nextSerialNumber = lastShop.serialNumber + 1; // 10002, 10003...
+      nextSerialNumber = lastShop.serialNumber + 1;
     } else if (lastShop && lastShop.serialNumber > 0) {
-      // Agar pehle se 1, 2, 3 type ke number chal rahay hain, toh usi mein +1 kar dega
       nextSerialNumber = lastShop.serialNumber + 1;
     }
 
@@ -28,7 +25,7 @@ const createShop = async (req, res) => {
       contact,
       address,
       assignedRoute,
-      serialNumber: nextSerialNumber, // 👈 System ab khud number dega
+      serialNumber: nextSerialNumber,
       status,
     });
 
@@ -40,13 +37,11 @@ const createShop = async (req, res) => {
 
 const getShops = async (req, res) => {
   try {
-    // Shops ko Serial Number ke hisab se sort kiya gaya hai
     const rawShops = await Shop.findAll({
       order: [["serialNumber", "ASC"]],
       raw: true,
     });
 
-    // Populate "assignedRoute" ko mimic karne ki logic
     const routeIds = [
       ...new Set(
         rawShops.map((s) => s.assignedRoute).filter((id) => id != null),
@@ -54,7 +49,7 @@ const getShops = async (req, res) => {
     ];
     const routes = await Route.findAll({
       where: { _id: { [Op.in]: routeIds } },
-      attributes: ["_id", "routeName"], // Sirf zaroori details
+      attributes: ["_id", "routeName"],
       raw: true,
     });
 
@@ -74,12 +69,9 @@ const getShops = async (req, res) => {
 
 const updateShop = async (req, res) => {
   try {
-    // 🔥 NAYA: Security check - Agar koi chalaki se serial number bheje toh usay ignore kar do
-    if (req.body.serialNumber !== undefined) {
-      delete req.body.serialNumber;
-    }
+    // 🔥 NAYA: Pehle wala security block hata diya gaya hai.
+    // Ab client apni marzi se edit form se serial number change kar sakega!
 
-    // Sequelize mein findByIdAndUpdate ki jagah
     const shop = await Shop.findByPk(req.params.id);
 
     if (!shop) {
@@ -90,6 +82,7 @@ const updateShop = async (req, res) => {
     Object.keys(req.body).forEach((key) => {
       shop[key] = req.body[key];
     });
+
     await shop.save();
 
     res.status(200).json(shop);
@@ -100,7 +93,6 @@ const updateShop = async (req, res) => {
 
 const deleteShop = async (req, res) => {
   try {
-    // Sequelize mein findByIdAndDelete ki jagah
     const shop = await Shop.findByPk(req.params.id);
 
     if (!shop) {

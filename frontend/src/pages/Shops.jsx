@@ -25,9 +25,7 @@ const Shops = () => {
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null });
 
   const [routeFilter, setRouteFilter] = useState("");
-  // 🔥 NAYA: "Active" ki jagah "All" kar diya taake shuru mein saari shops show hon
   const [statusFilter, setStatusFilter] = useState("All");
-
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -37,6 +35,7 @@ const Shops = () => {
     address: "",
     assignedRoute: "",
     status: "Active",
+    serialNumber: "", // 🔥 NAYA
   });
 
   const fetchData = async () => {
@@ -64,7 +63,12 @@ const Shops = () => {
     setLoading(true);
     try {
       if (editId) {
-        await api.put(`/shops/${editId}`, formData);
+        // 🔥 Make sure serialNumber is treated as a number
+        const payload = { ...formData };
+        if (payload.serialNumber) {
+          payload.serialNumber = parseFloat(payload.serialNumber);
+        }
+        await api.put(`/shops/${editId}`, payload);
         toast.success(t("Shop updated!"));
       } else {
         await api.post("/shops", formData);
@@ -77,6 +81,7 @@ const Shops = () => {
         address: "",
         assignedRoute: "",
         status: "Active",
+        serialNumber: "",
       });
       setEditId(null);
       setShowForm(false);
@@ -89,14 +94,17 @@ const Shops = () => {
   };
 
   const handleEdit = (shop) => {
-    setEditId(shop._id);
+    setEditId(shop._id || shop.id);
     setFormData({
       shopName: shop.shopName,
       ownerName: shop.ownerName,
       contact: shop.contact || "",
       address: shop.address || "",
-      assignedRoute: shop.assignedRoute ? shop.assignedRoute._id : "",
+      assignedRoute: shop.assignedRoute
+        ? shop.assignedRoute._id || shop.assignedRoute.id
+        : "",
       status: shop.status,
+      serialNumber: shop.serialNumber || "", // 🔥 NAYA
     });
     setShowForm(true);
 
@@ -124,9 +132,8 @@ const Shops = () => {
   };
 
   const filteredShopsList = shopsList.filter((s) => {
-    const matchRoute = routeFilter
-      ? s.assignedRoute?._id === routeFilter
-      : true;
+    const sRouteId = s.assignedRoute?._id || s.assignedRoute?.id;
+    const matchRoute = routeFilter ? sRouteId === routeFilter : true;
     const matchStatus =
       statusFilter === "All" ? true : s.status === statusFilter;
     return matchRoute && matchStatus;
@@ -173,7 +180,7 @@ const Shops = () => {
             >
               <option value="">{t("All Routes")}</option>
               {routesList.map((r) => (
-                <option key={r._id} value={r._id}>
+                <option key={r._id || r.id} value={r._id || r.id}>
                   {r.routeName}
                 </option>
               ))}
@@ -211,6 +218,24 @@ const Shops = () => {
             onSubmit={handleSubmit}
             className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${language === "ur" ? "text-right" : "text-left"}`}
           >
+            {/* 🔥 NAYA: Edit form mein Serial Number dikhayein */}
+            {editId && (
+              <div>
+                <label className="block text-sm font-bold text-indigo-600 mb-1">
+                  {t("Account No (Sequence)")}
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  name="serialNumber"
+                  value={formData.serialNumber}
+                  onChange={handleChange}
+                  required
+                  className={`w-full border-2 border-indigo-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-indigo-50 ${language === "ur" ? "text-right" : "text-left"}`}
+                />
+              </div>
+            )}
+
             <div>
               <label className="block text-sm text-gray-600 mb-1">
                 {t("Shop Name *")}
@@ -265,7 +290,7 @@ const Shops = () => {
               >
                 <option value="">{t("-- Select Route --")}</option>
                 {routesList.map((r) => (
-                  <option key={r._id} value={r._id}>
+                  <option key={r._id || r.id} value={r._id || r.id}>
                     {r.routeName}
                   </option>
                 ))}
@@ -361,7 +386,7 @@ const Shops = () => {
               ) : (
                 filteredShopsList.map((shop) => (
                   <tr
-                    key={shop._id}
+                    key={shop._id || shop.id}
                     className="border-b hover:bg-gray-50 text-sm transition-colors"
                   >
                     <td
@@ -411,7 +436,10 @@ const Shops = () => {
                         </button>
                         <button
                           onClick={() =>
-                            setDeleteModal({ show: true, id: shop._id })
+                            setDeleteModal({
+                              show: true,
+                              id: shop._id || shop.id,
+                            })
                           }
                           className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
                           title={t("Delete")}
@@ -431,7 +459,7 @@ const Shops = () => {
         <div className="md:hidden flex flex-col p-4 gap-4 bg-gray-50">
           {filteredShopsList.map((shop) => (
             <div
-              key={shop._id}
+              key={shop._id || shop.id}
               className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col gap-3"
             >
               <div
@@ -491,7 +519,9 @@ const Shops = () => {
                     <Edit size={16} /> {t("Edit")}
                   </button>
                   <button
-                    onClick={() => setDeleteModal({ show: true, id: shop._id })}
+                    onClick={() =>
+                      setDeleteModal({ show: true, id: shop._id || shop.id })
+                    }
                     className={`flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg font-medium text-sm hover:bg-red-100 ${language === "ur" ? "flex-row-reverse" : ""}`}
                   >
                     <Trash2 size={16} /> {t("Delete")}
