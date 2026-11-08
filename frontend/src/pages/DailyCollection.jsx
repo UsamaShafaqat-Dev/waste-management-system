@@ -6,6 +6,7 @@ import {
   Truck,
   Save,
   AlertCircle,
+  Search, // 🔥 Search Icon imported
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
@@ -29,6 +30,9 @@ const DailyCollection = () => {
   const [loadedRouteId, setLoadedRouteId] = useState("");
   const [shopsError, setShopsError] = useState("");
   const [factoryWeight, setFactoryWeight] = useState("");
+
+  // 🔥 NAYA: Search state
+  const [searchQuery, setSearchQuery] = useState("");
 
   const routeDetail = routes.find(
     (route) => getEntityId(route) === selectedRoute,
@@ -73,6 +77,7 @@ const DailyCollection = () => {
     setLoadedRouteId("");
     setShopsError("");
     setFactoryWeight("");
+    setSearchQuery(""); // Reset search on route change
 
     if (!selectedRoute || !date) {
       setFetchingShops(false);
@@ -134,9 +139,13 @@ const DailyCollection = () => {
     };
   }, [selectedRoute, date]);
 
-  const handleWeightChange = (index, value) => {
-    const updatedEntries = [...shopEntries];
-    updatedEntries[index].weightKg = value;
+  const handleWeightChange = (shopId, value) => {
+    const updatedEntries = shopEntries.map((entry) => {
+      if (entry.shopId === shopId) {
+        return { ...entry, weightKg: value };
+      }
+      return entry;
+    });
     setShopEntries(updatedEntries);
   };
 
@@ -174,13 +183,10 @@ const DailyCollection = () => {
       document.getElementById("save-collection-btn")?.focus();
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      let prevInput = document.getElementById(
-        `weight-input-${shopEntries.length - 1}`,
-      );
+      const lastIndex = filteredShopEntries.length - 1;
+      let prevInput = document.getElementById(`weight-input-${lastIndex}`);
       if (!prevInput) {
-        prevInput = document.getElementById(
-          `weight-input-mobile-${shopEntries.length - 1}`,
-        );
+        prevInput = document.getElementById(`weight-input-mobile-${lastIndex}`);
       }
       if (prevInput) {
         prevInput.focus();
@@ -194,7 +200,6 @@ const DailyCollection = () => {
     0,
   );
 
-  // 🔥 Live Difference Calculator
   const getDifferenceStatus = () => {
     if (factoryWeight === "" || factoryWeight === null) return null;
     const fWeight = parseFloat(factoryWeight) || 0;
@@ -250,6 +255,11 @@ const DailyCollection = () => {
     }
   };
 
+  // 🔥 NAYA: Filter shops based on search query
+  const filteredShopEntries = shopEntries.filter((shop) =>
+    shop.shopName.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
   return (
     <div
       className={`space-y-6 w-full ${language === "ur" ? "text-right" : "text-left"}`}
@@ -285,7 +295,6 @@ const DailyCollection = () => {
           <label
             className={`block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse justify-end" : ""}`}
           >
-            <Map size={16} />
             {t("Select Route")}
           </label>
           <select
@@ -326,6 +335,24 @@ const DailyCollection = () => {
 
       {selectedRoute && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+          {/* 🔥 NAYA: Search Bar Container */}
+          <div className="p-4 border-b border-gray-100">
+            <div
+              className={`flex items-center gap-2 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-green-500 ${language === "ur" ? "flex-row-reverse" : ""}`}
+            >
+              <Search size={20} className="text-gray-400" />
+              <input
+                type="text"
+                placeholder={t(
+                  "Search shops by name (e.g., Fayyaz, Sanjar Pur)...",
+                )}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`w-full bg-transparent outline-none text-gray-700 placeholder-gray-400 ${language === "ur" ? "text-right" : ""}`}
+              />
+            </div>
+          </div>
+
           {fetchingShops ? (
             <div className="p-8 text-center text-gray-500">
               {t("Loading shops...")}
@@ -371,34 +398,45 @@ const DailyCollection = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {shopEntries.map((entry, index) => (
-                      <tr
-                        key={entry.shopId}
-                        className="border-b hover:bg-gray-50 transition-colors"
-                      >
-                        <td className="px-6 py-4 font-black text-indigo-700 text-lg">
-                          #{entry.serialNumber}
-                        </td>
-                        <td className="px-6 py-4 font-bold text-gray-800 text-lg">
-                          {entry.shopName}
-                        </td>
-                        <td className="px-6 py-4">
-                          <input
-                            id={`weight-input-${index}`}
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={entry.weightKg}
-                            onChange={(e) =>
-                              handleWeightChange(index, e.target.value)
-                            }
-                            onKeyDown={(e) => handleKeyDown(e, index)}
-                            className={`w-full border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500 px-4 py-3 outline-none text-xl font-medium text-blue-700 bg-blue-50 ${language === "ur" ? "text-right" : "text-left"}`}
-                            placeholder="0"
-                          />
+                    {filteredShopEntries.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan="3"
+                          className="text-center py-6 text-gray-500"
+                        >
+                          {t("No shops matched your search.")}
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredShopEntries.map((entry, index) => (
+                        <tr
+                          key={entry.shopId}
+                          className="border-b hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="px-6 py-4 font-black text-indigo-700 text-lg">
+                            #{entry.serialNumber}
+                          </td>
+                          <td className="px-6 py-4 font-bold text-gray-800 text-lg">
+                            {entry.shopName}
+                          </td>
+                          <td className="px-6 py-4">
+                            <input
+                              id={`weight-input-${index}`}
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={entry.weightKg}
+                              onChange={(e) =>
+                                handleWeightChange(entry.shopId, e.target.value)
+                              }
+                              onKeyDown={(e) => handleKeyDown(e, index)}
+                              className={`w-full border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500 px-4 py-3 outline-none text-xl font-medium text-blue-700 bg-blue-50 ${language === "ur" ? "text-right" : "text-left"}`}
+                              placeholder="0"
+                            />
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                   <tfoot>
                     <tr className="bg-green-50 border-t-2 border-green-200">
@@ -420,43 +458,49 @@ const DailyCollection = () => {
 
               {/* MOBILE VIEW */}
               <div className="md:hidden p-4 space-y-4">
-                {shopEntries.map((entry, index) => (
-                  <div
-                    key={entry.shopId}
-                    className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm space-y-3"
-                  >
-                    <div className="flex justify-between items-center border-b pb-2">
-                      <span
-                        className={`font-bold text-gray-800 text-xl flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
-                      >
-                        <span className="bg-indigo-100 text-indigo-800 font-black px-2 py-1 rounded text-sm">
-                          #{entry.serialNumber}
-                        </span>
-                        {entry.shopName}
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      <label
-                        className={`text-xs font-semibold text-gray-500 uppercase block ${language === "ur" ? "text-right" : ""}`}
-                      >
-                        {t("Enter Weight (KG)")}
-                      </label>
-                      <input
-                        id={`weight-input-mobile-${index}`}
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={entry.weightKg}
-                        onChange={(e) =>
-                          handleWeightChange(index, e.target.value)
-                        }
-                        onKeyDown={(e) => handleKeyDown(e, index)}
-                        className={`w-full border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500 px-4 py-3 outline-none text-2xl font-bold text-blue-700 bg-blue-50 ${language === "ur" ? "text-right" : "text-left"}`}
-                        placeholder="0"
-                      />
-                    </div>
+                {filteredShopEntries.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500">
+                    {t("No shops matched your search.")}
                   </div>
-                ))}
+                ) : (
+                  filteredShopEntries.map((entry, index) => (
+                    <div
+                      key={entry.shopId}
+                      className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm space-y-3"
+                    >
+                      <div className="flex justify-between items-center border-b pb-2">
+                        <span
+                          className={`font-bold text-gray-800 text-xl flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
+                        >
+                          <span className="bg-indigo-100 text-indigo-800 font-black px-2 py-1 rounded text-sm">
+                            #{entry.serialNumber}
+                          </span>
+                          {entry.shopName}
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        <label
+                          className={`text-xs font-semibold text-gray-500 uppercase block ${language === "ur" ? "text-right" : ""}`}
+                        >
+                          {t("Enter Weight (KG)")}
+                        </label>
+                        <input
+                          id={`weight-input-mobile-${index}`}
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={entry.weightKg}
+                          onChange={(e) =>
+                            handleWeightChange(entry.shopId, e.target.value)
+                          }
+                          onKeyDown={(e) => handleKeyDown(e, index)}
+                          className={`w-full border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500 px-4 py-3 outline-none text-2xl font-bold text-blue-700 bg-blue-50 ${language === "ur" ? "text-right" : "text-left"}`}
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
                 <div className="bg-gray-800 text-white rounded-lg p-5 shadow-md mt-6">
                   <div
                     className={`flex justify-between items-center text-sm border-gray-700 ${language === "ur" ? "flex-row-reverse" : ""}`}
@@ -495,7 +539,6 @@ const DailyCollection = () => {
                     />
                   </div>
 
-                  {/* 🔥 LIVE SHORTAGE/EXTRA STATUS */}
                   {diffStatus && (
                     <div
                       className={`flex justify-between items-center pt-3 border-t border-blue-200 ${language === "ur" ? "flex-row-reverse" : ""}`}

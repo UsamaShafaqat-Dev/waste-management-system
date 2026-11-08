@@ -50,6 +50,7 @@ const Dashboard = () => {
     const fetchStats = async () => {
       setLoading(true);
       try {
+        // Query param ab direct bheja ja raha hai
         const { data } = await api.get(
           `/dashboard?date=${selectedDate}&route=${selectedRoute}`,
         );
@@ -122,7 +123,10 @@ const Dashboard = () => {
             >
               <option value="All">{t("All Routes (Overall)")}</option>
               {routesList.map((route) => (
-                <option key={route._id} value={route._id}>
+                <option
+                  key={route._id || route.id}
+                  value={route._id || route.id}
+                >
                   {route.routeName}
                 </option>
               ))}
@@ -209,7 +213,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* 🔥 Route-wise Breakdown Table (Ab Full Width Par) */}
+      {/* 🔥 Route-wise Breakdown Table */}
       <div className="pt-4 space-y-4">
         <h2
           className={`text-lg font-bold text-gray-800 px-1 flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
@@ -343,9 +347,7 @@ const Dashboard = () => {
               {loading ? "..." : stats.totalRoutes || 0}
             </p>
           </div>
-          <div className="p-4 bg-orange-50 text-orange-600 rounded-2xl">
-            <Map size={28} />
-          </div>
+          <div className="p-4 bg-orange-50 text-orange-600 rounded-2xl"></div>
         </div>
 
         <div

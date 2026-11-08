@@ -12,26 +12,26 @@ const getDashboardStats = async (req, res) => {
   try {
     const { date, route } = req.query;
 
-    // Mongoose ke countDocuments ki jagah Sequelize ka count()
     const totalVehicles = await Vehicle.count({ where: { status: "Active" } });
     const totalRoutes = await Route.count({ where: { status: "Active" } });
     const totalShops = await Shop.count({ where: { status: "Active" } });
 
     const matchQuery = {};
 
-    // 1. EXACT DATE MATCH LOGIC (Sequelize Op.between)
+    // 1. EXACT DATE MATCH LOGIC
     if (date && date !== "All" && date !== "undefined" && date !== "") {
       const startDate = new Date(`${date}T00:00:00.000Z`);
       const endDate = new Date(`${date}T23:59:59.999Z`);
       matchQuery.date = { [Op.between]: [startDate, endDate] };
     }
 
-    // 2. ROUTE MATCH LOGIC
+    // 2. ROUTE MATCH LOGIC (Fixed for MySQL Int ID matching)
     if (route && route !== "All" && route !== "undefined" && route !== "") {
-      matchQuery.route = route; // MySQL mein simple integer ID hoti hai
+      // 🔥 Bug Fix: Convert query string to integer for DB matching
+      matchQuery.route = parseInt(route, 10);
     }
 
-    // 3. Calculate Shop Weight (Sequelize sum function)
+    // 3. Calculate Shop Weight
     const totalShopWeight =
       (await DailyCollection.sum("weightKg", { where: matchQuery })) || 0;
 
@@ -39,7 +39,7 @@ const getDashboardStats = async (req, res) => {
     const totalFactoryWeight =
       (await FactoryWeight.sum("factoryWeight", { where: matchQuery })) || 0;
 
-    // 5. Total Difference (Factory Wgt - Shop Wgt)
+    // 5. Total Difference
     const totalDifference = totalFactoryWeight - totalShopWeight;
 
     // 6. Route-wise Breakdown Logic
@@ -51,11 +51,10 @@ const getDashboardStats = async (req, res) => {
     let filteredRoutes = allActiveRoutes;
     if (matchQuery.route) {
       filteredRoutes = allActiveRoutes.filter(
-        (r) => r._id.toString() === matchQuery.route.toString(),
+        (r) => (r._id || r.id) === matchQuery.route,
       );
     }
 
-    // Group by route for shop weight using Sequelize aggregate
     const shopByRoute = await DailyCollection.findAll({
       attributes: [
         "route",
@@ -66,7 +65,6 @@ const getDashboardStats = async (req, res) => {
       raw: true,
     });
 
-    // Group by route for factory weight using Sequelize aggregate
     const factoryByRoute = await FactoryWeight.findAll({
       attributes: [
         "route",
@@ -78,12 +76,11 @@ const getDashboardStats = async (req, res) => {
     });
 
     const routeBreakdown = filteredRoutes.map((r) => {
-      const rId = r._id.toString();
+      const rId = r._id || r.id;
 
-      const sData = shopByRoute.find((s) => s.route.toString() === rId);
-      const fData = factoryByRoute.find((f) => f.route.toString() === rId);
+      const sData = shopByRoute.find((s) => s.route === rId);
+      const fData = factoryByRoute.find((f) => f.route === rId);
 
-      // Sequelize grouped sums string bhi return kar dete hain kabhi kabhi, is liye parseFloat lagaya hai
       const sWgt =
         sData && sData.totalWeight ? parseFloat(sData.totalWeight) : 0;
       const fWgt =
@@ -97,33 +94,32 @@ const getDashboardStats = async (req, res) => {
       };
     });
 
-    // 🔥 NAYA: Recent Activity (Latest 6 Collections)
+    // 7. Recent Activity (Latest 6 Collections)
     const recentActivity = await DailyCollection.findAll({
       where: matchQuery,
-      order: [["_id", "DESC"]], // Latest pehle
+      order: [["id", "DESC"]],
       limit: 6,
       raw: true,
     });
 
-    // Manual populate (Associations ke errors se bachne ke liye safe tareeqa)
     const shopIds = [...new Set(recentActivity.map((item) => item.shop))];
     const routeIds = [...new Set(recentActivity.map((item) => item.route))];
 
     const shops = await Shop.findAll({
-      where: { _id: { [Op.in]: shopIds } },
+      where: { id: { [Op.in]: shopIds } },
       raw: true,
     });
     const routesList = await Route.findAll({
-      where: { _id: { [Op.in]: routeIds } },
+      where: { id: { [Op.in]: routeIds } },
       raw: true,
     });
 
     const formattedRecentActivity = recentActivity.map((item) => {
-      const shop = shops.find((s) => s._id === item.shop);
-      const routeObj = routesList.find((r) => r._id === item.route);
+      const shop = shops.find((s) => s.id === item.shop);
+      const routeObj = routesList.find((r) => r.id === item.route);
 
       return {
-        id: item._id,
+        id: item.id,
         shopName: shop ? shop.shopName : "Unknown Shop",
         routeName: routeObj ? routeObj.routeName : "Unknown Route",
         weightKg: item.weightKg,

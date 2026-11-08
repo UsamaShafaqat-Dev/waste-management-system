@@ -7,6 +7,8 @@ import {
   AlertTriangle,
   Filter,
   Loader2,
+  GripVertical,
+  X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
@@ -28,6 +30,9 @@ const Shops = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // 🔥 NAYA: Drag and Drop State
+  const [draggedIndex, setDraggedIndex] = useState(null);
+
   const [formData, setFormData] = useState({
     shopName: "",
     ownerName: "",
@@ -35,7 +40,7 @@ const Shops = () => {
     address: "",
     assignedRoute: "",
     status: "Active",
-    serialNumber: "", // 🔥 NAYA
+    serialNumber: "",
   });
 
   const fetchData = async () => {
@@ -63,7 +68,6 @@ const Shops = () => {
     setLoading(true);
     try {
       if (editId) {
-        // 🔥 Make sure serialNumber is treated as a number
         const payload = { ...formData };
         if (payload.serialNumber) {
           payload.serialNumber = parseFloat(payload.serialNumber);
@@ -104,15 +108,10 @@ const Shops = () => {
         ? shop.assignedRoute._id || shop.assignedRoute.id
         : "",
       status: shop.status,
-      serialNumber: shop.serialNumber || "", // 🔥 NAYA
+      serialNumber: shop.serialNumber || "",
     });
+    // 🔥 Popup Form On
     setShowForm(true);
-
-    setTimeout(() => {
-      document
-        .getElementById("page-top")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
   };
 
   const executeDelete = async () => {
@@ -138,6 +137,77 @@ const Shops = () => {
       statusFilter === "All" ? true : s.status === statusFilter;
     return matchRoute && matchStatus;
   });
+
+  // 🔥 NAYA: Drag & Drop Handlers
+  const handleDragStart = (e, index) => {
+    if (!routeFilter) {
+      e.preventDefault();
+      toast.error(
+        t(
+          "Please select a specific Route from the filter first to drag and drop.",
+        ),
+      );
+      return;
+    }
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault(); // allow drop
+  };
+
+  const handleDrop = async (index) => {
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newList = [...filteredShopsList];
+    const draggedItem = newList[draggedIndex];
+
+    // Nayi tarteeb banao
+    newList.splice(draggedIndex, 1);
+    newList.splice(index, 0, draggedItem);
+
+    // Unhi serial numbers ko nai tarteeb mein lagao taake db mein sequence theek rahay
+    const existingSerials = filteredShopsList
+      .map((s) => s.serialNumber)
+      .sort((a, b) => a - b);
+    const updatedShops = newList.map((shop, i) => ({
+      ...shop,
+      serialNumber: existingSerials[i],
+    }));
+
+    // Foran screen par update karo (Optimistic Update)
+    setShopsList((prev) => {
+      const prevCopy = [...prev];
+      updatedShops.forEach((updated) => {
+        const idx = prevCopy.findIndex(
+          (p) => (p._id || p.id) === (updated._id || updated.id),
+        );
+        if (idx !== -1) prevCopy[idx] = updated;
+      });
+      return prevCopy;
+    });
+
+    setDraggedIndex(null);
+    setLoading(true);
+
+    // Background mein DB update karo
+    try {
+      await Promise.all(
+        updatedShops.map((shop) =>
+          api.put(`/shops/${shop._id || shop.id}`, {
+            serialNumber: shop.serialNumber,
+          }),
+        ),
+      );
+      toast.success(t("Shops reordered successfully!"));
+      fetchData();
+    } catch (error) {
+      toast.error(t("Failed to save new order"));
+      fetchData();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div
@@ -167,7 +237,7 @@ const Shops = () => {
             >
               <option value="Active">{t("Active")}</option>
               <option value="Inactive">{t("Inactive")}</option>
-              <option value="All">All Shops</option>
+              <option value="All">{t("All Shops")}</option>
             </select>
           </div>
 
@@ -190,145 +260,159 @@ const Shops = () => {
           {user?.role === "Admin" && (
             <button
               onClick={() => {
-                setShowForm(!showForm);
-                if (showForm) setEditId(null);
+                setShowForm(true);
+                setEditId(null);
               }}
               className={`bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-2 hover:bg-green-700 transition-colors flex-1 md:flex-none ${language === "ur" ? "flex-row-reverse" : ""}`}
             >
-              {showForm ? (
-                t("Cancel")
-              ) : (
-                <>
-                  <Plus size={18} /> {t("Add Shop")}
-                </>
-              )}
+              <Plus size={18} /> {t("Add Shop")}
             </button>
           )}
         </div>
       </div>
 
+      {/* 🔥 NAYA: Form in a Modal (Popup) */}
       {showForm && user?.role === "Admin" && (
-        <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2
-            className={`text-lg font-semibold mb-4 text-gray-800 ${language === "ur" ? "text-right" : "text-left"}`}
-          >
-            {editId ? t("Edit Shop") : t("Add New Shop")}
-          </h2>
-          <form
-            onSubmit={handleSubmit}
-            className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${language === "ur" ? "text-right" : "text-left"}`}
-          >
-            {/* 🔥 NAYA: Edit form mein Serial Number dikhayein */}
-            {editId && (
-              <div>
-                <label className="block text-sm font-bold text-indigo-600 mb-1">
-                  {t("Account No (Sequence)")}
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  name="serialNumber"
-                  value={formData.serialNumber}
-                  onChange={handleChange}
-                  required
-                  className={`w-full border-2 border-indigo-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-indigo-50 ${language === "ur" ? "text-right" : "text-left"}`}
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">
-                {t("Shop Name *")}
-              </label>
-              <input
-                type="text"
-                name="shopName"
-                value={formData.shopName}
-                onChange={handleChange}
-                required
-                maxLength="50"
-                className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">
-                {t("Owner Name *")}
-              </label>
-              <input
-                type="text"
-                name="ownerName"
-                value={formData.ownerName}
-                onChange={handleChange}
-                required
-                maxLength="50"
-                className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">
-                {t("Contact (Optional)")}
-              </label>
-              <input
-                type="text"
-                name="contact"
-                value={formData.contact}
-                onChange={handleChange}
-                maxLength="15"
-                className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">
-                {t("Assign Route *")}
-              </label>
-              <select
-                name="assignedRoute"
-                value={formData.assignedRoute}
-                onChange={handleChange}
-                required
-                className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white ${language === "ur" ? "text-right" : "text-left"}`}
-              >
-                <option value="">{t("-- Select Route --")}</option>
-                {routesList.map((r) => (
-                  <option key={r._id || r.id} value={r._id || r.id}>
-                    {r.routeName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">
-                {t("Status")}
-              </label>
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white ${language === "ur" ? "text-right" : "text-left"}`}
-              >
-                <option value="Active">{t("Active")}</option>
-                <option value="Inactive">{t("Inactive")}</option>
-              </select>
-            </div>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto transform transition-all">
             <div
-              className={`md:col-span-3 flex ${language === "ur" ? "justify-start" : "justify-end"} mt-2`}
+              className={`flex justify-between items-center mb-6 border-b pb-4 ${language === "ur" ? "flex-row-reverse" : ""}`}
             >
-              <button
-                type="submit"
-                disabled={loading}
-                className={`w-full md:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-white font-medium ${loading ? "bg-green-400" : "bg-green-600 hover:bg-green-700"}`}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="animate-spin" size={18} />{" "}
-                    {t("Saving...")}
-                  </>
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                {editId ? (
+                  <Edit className="text-blue-600" />
                 ) : (
-                  t("Save Shop")
+                  <Plus className="text-green-600" />
                 )}
+                {editId ? t("Edit Shop") : t("Add New Shop")}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowForm(false);
+                  setEditId(null);
+                }}
+                className="p-2 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 rounded-full transition-colors"
+              >
+                <X size={20} />
               </button>
             </div>
-          </form>
+
+            <form
+              onSubmit={handleSubmit}
+              className={`grid grid-cols-1 md:grid-cols-3 gap-5 ${language === "ur" ? "text-right" : "text-left"}`}
+            >
+              {editId && (
+                <div>
+                  <label className="block text-sm font-bold text-indigo-600 mb-1">
+                    {t("Account No (Sequence)")}
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    name="serialNumber"
+                    value={formData.serialNumber}
+                    onChange={handleChange}
+                    required
+                    className={`w-full border-2 border-indigo-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-indigo-50 ${language === "ur" ? "text-right" : "text-left"}`}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  {t("Shop Name *")}
+                </label>
+                <input
+                  type="text"
+                  name="shopName"
+                  value={formData.shopName}
+                  onChange={handleChange}
+                  required
+                  maxLength="50"
+                  className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  {t("Owner Name *")}
+                </label>
+                <input
+                  type="text"
+                  name="ownerName"
+                  value={formData.ownerName}
+                  onChange={handleChange}
+                  required
+                  maxLength="50"
+                  className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  {t("Contact (Optional)")}
+                </label>
+                <input
+                  type="text"
+                  name="contact"
+                  value={formData.contact}
+                  onChange={handleChange}
+                  maxLength="15"
+                  className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 ${language === "ur" ? "text-right" : "text-left"}`}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  {t("Assign Route *")}
+                </label>
+                <select
+                  name="assignedRoute"
+                  value={formData.assignedRoute}
+                  onChange={handleChange}
+                  required
+                  className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  <option value="">{t("-- Select Route --")}</option>
+                  {routesList.map((r) => (
+                    <option key={r._id || r.id} value={r._id || r.id}>
+                      {r.routeName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  {t("Status")}
+                </label>
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  className={`w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white ${language === "ur" ? "text-right" : "text-left"}`}
+                >
+                  <option value="Active">{t("Active")}</option>
+                  <option value="Inactive">{t("Inactive")}</option>
+                </select>
+              </div>
+
+              <div
+                className={`md:col-span-3 flex ${language === "ur" ? "justify-start" : "justify-end"} mt-6`}
+              >
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full md:w-auto flex items-center justify-center gap-2 px-8 py-3 rounded-lg text-white font-medium ${loading ? "bg-green-400" : "bg-green-600 hover:bg-green-700"} shadow-lg`}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="animate-spin" size={20} />{" "}
+                      {t("Saving...")}
+                    </>
+                  ) : (
+                    t("Save Shop")
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -384,15 +468,36 @@ const Shops = () => {
                   </td>
                 </tr>
               ) : (
-                filteredShopsList.map((shop) => (
+                filteredShopsList.map((shop, index) => (
                   <tr
                     key={shop._id || shop.id}
-                    className="border-b hover:bg-gray-50 text-sm transition-colors"
+                    draggable={!!routeFilter && user?.role === "Admin"}
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={handleDragOver}
+                    onDrop={() => handleDrop(index)}
+                    onDragEnter={(e) =>
+                      e.currentTarget.classList.add("bg-indigo-50")
+                    }
+                    onDragLeave={(e) =>
+                      e.currentTarget.classList.remove("bg-indigo-50")
+                    }
+                    className={`border-b hover:bg-gray-50 text-sm transition-all ${draggedIndex === index ? "opacity-40 bg-gray-200" : ""}`}
                   >
                     <td
-                      className={`px-4 py-3 font-black text-indigo-700 text-lg ${language === "ur" ? "text-right" : "text-left"}`}
+                      className={`px-4 py-3 ${language === "ur" ? "text-right" : "text-left"}`}
                     >
-                      #{shop.serialNumber}
+                      <div className="flex items-center gap-2 font-black text-indigo-700 text-lg">
+                        {/* Drag Handle Icon */}
+                        {routeFilter && user?.role === "Admin" && (
+                          <span
+                            className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-indigo-600"
+                            title="Drag to reorder"
+                          >
+                            <GripVertical size={20} />
+                          </span>
+                        )}
+                        #{shop.serialNumber}
+                      </div>
                     </td>
                     <td
                       className={`px-4 py-3 font-bold text-gray-800 ${language === "ur" ? "text-right" : "text-left"}`}
@@ -457,15 +562,24 @@ const Shops = () => {
 
         {/* Mobile View */}
         <div className="md:hidden flex flex-col p-4 gap-4 bg-gray-50">
-          {filteredShopsList.map((shop) => (
+          {filteredShopsList.map((shop, index) => (
             <div
               key={shop._id || shop.id}
+              draggable={!!routeFilter && user?.role === "Admin"}
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragOver={handleDragOver}
+              onDrop={() => handleDrop(index)}
               className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col gap-3"
             >
               <div
                 className={`flex justify-between items-center border-b border-gray-100 pb-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
               >
                 <div className="flex items-center gap-2">
+                  {routeFilter && user?.role === "Admin" && (
+                    <span className="cursor-grab text-gray-400">
+                      <GripVertical size={20} />
+                    </span>
+                  )}
                   <span className="bg-indigo-100 text-indigo-800 font-black px-2 py-1 rounded text-sm">
                     #{shop.serialNumber}
                   </span>
@@ -534,7 +648,7 @@ const Shops = () => {
       </div>
 
       {deleteModal.show && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
             <div className="text-center flex flex-col items-center">
               <div className="h-14 w-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
@@ -565,7 +679,7 @@ const Shops = () => {
                 >
                   {isDeleting ? (
                     <>
-                      <Loader2 className="animate-spin" size={18} />
+                      <Loader2 className="animate-spin" size={18} />{" "}
                       {t("Deleting...")}
                     </>
                   ) : (
