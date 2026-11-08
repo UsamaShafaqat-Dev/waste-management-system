@@ -1,13 +1,11 @@
 const { Op } = require("sequelize");
-const { sequelize } = require("../config/db"); // Sequelize instance for functions
+const { sequelize } = require("../config/db");
 const Vehicle = require("../models/Vehicle");
 const Route = require("../models/Route");
 const Shop = require("../models/Shop");
 const DailyCollection = require("../models/DailyCollection");
 const FactoryWeight = require("../models/FactoryWeight");
 
-// @desc    Get dashboard statistics
-// @route   GET /api/dashboard
 const getDashboardStats = async (req, res) => {
   try {
     const { date, route } = req.query;
@@ -17,69 +15,70 @@ const getDashboardStats = async (req, res) => {
     const totalShops = await Shop.count({ where: { status: "Active" } });
 
     const matchQuery = {};
+    const factoryMatchQuery = {};
 
-    // 1. EXACT DATE MATCH LOGIC
+    // 1. DATE FILTER
     if (date && date !== "All" && date !== "undefined" && date !== "") {
       const startDate = new Date(`${date}T00:00:00.000Z`);
       const endDate = new Date(`${date}T23:59:59.999Z`);
       matchQuery.date = { [Op.between]: [startDate, endDate] };
+      factoryMatchQuery.date = { [Op.between]: [startDate, endDate] };
     }
 
-    // 2. ROUTE MATCH LOGIC (Fixed for MySQL Int ID matching)
+    // 2. ROUTE FILTER (MySQL Sequelize uses routeId usually)
     if (route && route !== "All" && route !== "undefined" && route !== "") {
-      // 🔥 Bug Fix: Convert query string to integer for DB matching
-      matchQuery.route = parseInt(route, 10);
+      const parsedRouteId = parseInt(route, 10);
+      matchQuery.routeId = parsedRouteId; // Updated from route to routeId
+      factoryMatchQuery.routeId = parsedRouteId;
     }
 
-    // 3. Calculate Shop Weight
+    // 3. Totals
     const totalShopWeight =
       (await DailyCollection.sum("weightKg", { where: matchQuery })) || 0;
-
-    // 4. Calculate Factory Weight
     const totalFactoryWeight =
-      (await FactoryWeight.sum("factoryWeight", { where: matchQuery })) || 0;
-
-    // 5. Total Difference
+      (await FactoryWeight.sum("factoryWeight", {
+        where: factoryMatchQuery,
+      })) || 0;
     const totalDifference = totalFactoryWeight - totalShopWeight;
 
-    // 6. Route-wise Breakdown Logic
+    // 4. Route-wise Breakdown
     const allActiveRoutes = await Route.findAll({
       where: { status: "Active" },
       raw: true,
     });
 
     let filteredRoutes = allActiveRoutes;
-    if (matchQuery.route) {
+    if (matchQuery.routeId) {
       filteredRoutes = allActiveRoutes.filter(
-        (r) => (r._id || r.id) === matchQuery.route,
+        (r) => (r.id || r._id) === matchQuery.routeId,
       );
     }
 
+    // Grouping using correct column name 'routeId'
     const shopByRoute = await DailyCollection.findAll({
       attributes: [
-        "route",
+        "routeId",
         [sequelize.fn("SUM", sequelize.col("weightKg")), "totalWeight"],
       ],
       where: matchQuery,
-      group: ["route"],
+      group: ["routeId"],
       raw: true,
     });
 
     const factoryByRoute = await FactoryWeight.findAll({
       attributes: [
-        "route",
+        "routeId",
         [sequelize.fn("SUM", sequelize.col("factoryWeight")), "totalWeight"],
       ],
-      where: matchQuery,
-      group: ["route"],
+      where: factoryMatchQuery,
+      group: ["routeId"],
       raw: true,
     });
 
     const routeBreakdown = filteredRoutes.map((r) => {
-      const rId = r._id || r.id;
-
-      const sData = shopByRoute.find((s) => s.route === rId);
-      const fData = factoryByRoute.find((f) => f.route === rId);
+      const rId = r.id || r._id;
+      const sData = shopByRoute.find((s) => s.routeId === rId);
+      const fData = factoryByRoute.find((f) => f.routeId === rId);
 
       const sWgt =
         sData && sData.totalWeight ? parseFloat(sData.totalWeight) : 0;
@@ -94,7 +93,7 @@ const getDashboardStats = async (req, res) => {
       };
     });
 
-    // 7. Recent Activity (Latest 6 Collections)
+    // 5. Recent Activity
     const recentActivity = await DailyCollection.findAll({
       where: matchQuery,
       order: [["id", "DESC"]],
@@ -102,8 +101,12 @@ const getDashboardStats = async (req, res) => {
       raw: true,
     });
 
-    const shopIds = [...new Set(recentActivity.map((item) => item.shop))];
-    const routeIds = [...new Set(recentActivity.map((item) => item.route))];
+    const shopIds = [
+      ...new Set(recentActivity.map((item) => item.shopId || item.shop)),
+    ].filter(Boolean);
+    const routeIds = [
+      ...new Set(recentActivity.map((item) => item.routeId || item.route)),
+    ].filter(Boolean);
 
     const shops = await Shop.findAll({
       where: { id: { [Op.in]: shopIds } },
@@ -115,8 +118,10 @@ const getDashboardStats = async (req, res) => {
     });
 
     const formattedRecentActivity = recentActivity.map((item) => {
-      const shop = shops.find((s) => s.id === item.shop);
-      const routeObj = routesList.find((r) => r.id === item.route);
+      const sId = item.shopId || item.shop;
+      const rId = item.routeId || item.route;
+      const shop = shops.find((s) => s.id === sId);
+      const routeObj = routesList.find((r) => r.id === rId);
 
       return {
         id: item.id,

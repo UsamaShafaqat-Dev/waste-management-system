@@ -132,7 +132,10 @@ const Shops = () => {
 
   const filteredShopsList = shopsList.filter((s) => {
     const sRouteId = s.assignedRoute?._id || s.assignedRoute?.id;
-    const matchRoute = routeFilter ? sRouteId === routeFilter : true;
+    // 🔥 BUG FIX: String conversion for safe matching between MySQL Integers and React Select Strings
+    const matchRoute = routeFilter
+      ? String(sRouteId) === String(routeFilter)
+      : true;
     const matchStatus =
       statusFilter === "All" ? true : s.status === statusFilter;
     return matchRoute && matchStatus;
