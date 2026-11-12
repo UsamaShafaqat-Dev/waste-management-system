@@ -255,7 +255,7 @@ const DailyCollection = () => {
     }
   };
 
-  // 🔥 NAYA: Filter shops based on search query
+  // 🔥 Filter shops based on search query
   const filteredShopEntries = shopEntries.filter((shop) =>
     shop.shopName.toLowerCase().includes(searchQuery.toLowerCase()),
   );
@@ -335,7 +335,6 @@ const DailyCollection = () => {
 
       {selectedRoute && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-          {/* 🔥 NAYA: Search Bar Container */}
           <div className="p-4 border-b border-gray-100">
             <div
               className={`flex items-center gap-2 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-green-500 ${language === "ur" ? "flex-row-reverse" : ""}`}
@@ -408,34 +407,78 @@ const DailyCollection = () => {
                         </td>
                       </tr>
                     ) : (
-                      filteredShopEntries.map((entry, index) => (
-                        <tr
-                          key={entry.shopId}
-                          className="border-b hover:bg-gray-50 transition-colors"
-                        >
-                          <td className="px-6 py-4 font-black text-indigo-700 text-lg">
-                            #{entry.serialNumber}
-                          </td>
-                          <td className="px-6 py-4 font-bold text-gray-800 text-lg">
-                            {entry.shopName}
-                          </td>
-                          <td className="px-6 py-4">
-                            <input
-                              id={`weight-input-${index}`}
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={entry.weightKg}
-                              onChange={(e) =>
-                                handleWeightChange(entry.shopId, e.target.value)
-                              }
-                              onKeyDown={(e) => handleKeyDown(e, index)}
-                              className={`w-full border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500 px-4 py-3 outline-none text-xl font-medium text-blue-700 bg-blue-50 ${language === "ur" ? "text-right" : "text-left"}`}
-                              placeholder="0"
-                            />
-                          </td>
-                        </tr>
-                      ))
+                      filteredShopEntries.map((entry, index) => {
+                        // 🔥 30 Shops Batch Logic
+                        const isBatchEnd =
+                          (index + 1) % 30 === 0 ||
+                          index === filteredShopEntries.length - 1;
+                        const batchStart = Math.floor(index / 30) * 30;
+                        const batchTotal = isBatchEnd
+                          ? filteredShopEntries
+                              .slice(batchStart, index + 1)
+                              .reduce(
+                                (sum, item) =>
+                                  sum + (parseFloat(item.weightKg) || 0),
+                                0,
+                              )
+                          : 0;
+
+                        return (
+                          <React.Fragment key={entry.shopId}>
+                            <tr className="border-b hover:bg-gray-50 transition-colors">
+                              <td className="px-6 py-4 font-black text-indigo-700 text-lg">
+                                #{entry.serialNumber}
+                              </td>
+                              <td className="px-6 py-4 font-bold text-gray-800 text-lg">
+                                {entry.shopName}
+                              </td>
+                              <td className="px-6 py-4">
+                                <input
+                                  id={`weight-input-${index}`}
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={entry.weightKg}
+                                  onChange={(e) =>
+                                    handleWeightChange(
+                                      entry.shopId,
+                                      e.target.value,
+                                    )
+                                  }
+                                  onKeyDown={(e) => handleKeyDown(e, index)}
+                                  className={`w-full border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500 px-4 py-3 outline-none text-xl font-medium text-blue-700 bg-blue-50 ${language === "ur" ? "text-right" : "text-left"}`}
+                                  placeholder="0"
+                                />
+                              </td>
+                            </tr>
+
+                            {/* 🔥 NAYA: Subtotal Row after every 30 shops */}
+                            {isBatchEnd && (
+                              <tr className="bg-indigo-50 border-b-4 border-indigo-200">
+                                <td
+                                  colSpan="2"
+                                  className={`px-6 py-4 font-bold text-indigo-800 text-xl ${
+                                    language === "ur"
+                                      ? "text-left"
+                                      : "text-right"
+                                  }`}
+                                >
+                                  {t("Total")} ({batchStart + 1} - {index + 1}):
+                                </td>
+                                <td
+                                  className={`px-6 py-4 font-black text-indigo-900 text-2xl ${
+                                    language === "ur"
+                                      ? "text-right"
+                                      : "text-left"
+                                  }`}
+                                >
+                                  {batchTotal} KG
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })
                     )}
                   </tbody>
                   <tfoot>
@@ -463,44 +506,73 @@ const DailyCollection = () => {
                     {t("No shops matched your search.")}
                   </div>
                 ) : (
-                  filteredShopEntries.map((entry, index) => (
-                    <div
-                      key={entry.shopId}
-                      className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm space-y-3"
-                    >
-                      <div className="flex justify-between items-center border-b pb-2">
-                        <span
-                          className={`font-bold text-gray-800 text-xl flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
-                        >
-                          <span className="bg-indigo-100 text-indigo-800 font-black px-2 py-1 rounded text-sm">
-                            #{entry.serialNumber}
-                          </span>
-                          {entry.shopName}
-                        </span>
-                      </div>
-                      <div className="space-y-1">
-                        <label
-                          className={`text-xs font-semibold text-gray-500 uppercase block ${language === "ur" ? "text-right" : ""}`}
-                        >
-                          {t("Enter Weight (KG)")}
-                        </label>
-                        <input
-                          id={`weight-input-mobile-${index}`}
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={entry.weightKg}
-                          onChange={(e) =>
-                            handleWeightChange(entry.shopId, e.target.value)
-                          }
-                          onKeyDown={(e) => handleKeyDown(e, index)}
-                          className={`w-full border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500 px-4 py-3 outline-none text-2xl font-bold text-blue-700 bg-blue-50 ${language === "ur" ? "text-right" : "text-left"}`}
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
-                  ))
+                  filteredShopEntries.map((entry, index) => {
+                    // 🔥 30 Shops Batch Logic for Mobile
+                    const isBatchEnd =
+                      (index + 1) % 30 === 0 ||
+                      index === filteredShopEntries.length - 1;
+                    const batchStart = Math.floor(index / 30) * 30;
+                    const batchTotal = isBatchEnd
+                      ? filteredShopEntries
+                          .slice(batchStart, index + 1)
+                          .reduce(
+                            (sum, item) =>
+                              sum + (parseFloat(item.weightKg) || 0),
+                            0,
+                          )
+                      : 0;
+
+                    return (
+                      <React.Fragment key={entry.shopId}>
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm space-y-3">
+                          <div className="flex justify-between items-center border-b pb-2">
+                            <span
+                              className={`font-bold text-gray-800 text-xl flex items-center gap-2 ${language === "ur" ? "flex-row-reverse" : ""}`}
+                            >
+                              <span className="bg-indigo-100 text-indigo-800 font-black px-2 py-1 rounded text-sm">
+                                #{entry.serialNumber}
+                              </span>
+                              {entry.shopName}
+                            </span>
+                          </div>
+                          <div className="space-y-1">
+                            <label
+                              className={`text-xs font-semibold text-gray-500 uppercase block ${language === "ur" ? "text-right" : ""}`}
+                            >
+                              {t("Enter Weight (KG)")}
+                            </label>
+                            <input
+                              id={`weight-input-mobile-${index}`}
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={entry.weightKg}
+                              onChange={(e) =>
+                                handleWeightChange(entry.shopId, e.target.value)
+                              }
+                              onKeyDown={(e) => handleKeyDown(e, index)}
+                              className={`w-full border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500 px-4 py-3 outline-none text-2xl font-bold text-blue-700 bg-blue-50 ${language === "ur" ? "text-right" : "text-left"}`}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 🔥 NAYA: Subtotal Card after every 30 shops for Mobile */}
+                        {isBatchEnd && (
+                          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 shadow-md mt-4 mb-6 flex justify-between items-center">
+                            <span className="font-bold text-indigo-800 text-lg">
+                              {t("Total")} ({batchStart + 1} - {index + 1}):
+                            </span>
+                            <span className="font-black text-indigo-900 text-2xl">
+                              {batchTotal} KG
+                            </span>
+                          </div>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
                 )}
+
                 <div className="bg-gray-800 text-white rounded-lg p-5 shadow-md mt-6">
                   <div
                     className={`flex justify-between items-center text-sm border-gray-700 ${language === "ur" ? "flex-row-reverse" : ""}`}
