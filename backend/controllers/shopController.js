@@ -7,15 +7,17 @@ const createShop = async (req, res) => {
     const { shopName, ownerName, contact, address, assignedRoute, status } =
       req.body;
 
+    // 🔥 NAYA: Ab yeh poori database nahi, sirf uss specific route ki aakhri dukaan dhoonde ga
     const lastShop = await Shop.findOne({
+      where: { assignedRoute },
       order: [["serialNumber", "DESC"]],
     });
 
-    let nextSerialNumber = 10001;
+    // Naye route ki pehli dukaan ka default number 1 hoga
+    let nextSerialNumber = 1;
 
-    if (lastShop && lastShop.serialNumber >= 10001) {
-      nextSerialNumber = lastShop.serialNumber + 1;
-    } else if (lastShop && lastShop.serialNumber > 0) {
+    // Agar us route mein pehle se dukaanein hain, toh us route ke aakhri number mein +1 kar do
+    if (lastShop && lastShop.serialNumber > 0) {
       nextSerialNumber = lastShop.serialNumber + 1;
     }
 
