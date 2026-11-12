@@ -9,6 +9,7 @@ import {
   Loader2,
   GripVertical,
   X,
+  Search, // 🔥 Search Icon Imported
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../services/api";
@@ -30,7 +31,10 @@ const Shops = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 🔥 NAYA: Drag and Drop State
+  // 🔥 NAYA: Search State
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Drag and Drop State
   const [draggedIndex, setDraggedIndex] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -110,7 +114,6 @@ const Shops = () => {
       status: shop.status,
       serialNumber: shop.serialNumber || "",
     });
-    // 🔥 Popup Form On
     setShowForm(true);
   };
 
@@ -130,18 +133,23 @@ const Shops = () => {
     }
   };
 
+  // 🔥 NAYA: Filter Logic Updated to include Search
   const filteredShopsList = shopsList.filter((s) => {
     const sRouteId = s.assignedRoute?._id || s.assignedRoute?.id;
-    // 🔥 BUG FIX: String conversion for safe matching between MySQL Integers and React Select Strings
     const matchRoute = routeFilter
       ? String(sRouteId) === String(routeFilter)
       : true;
     const matchStatus =
       statusFilter === "All" ? true : s.status === statusFilter;
-    return matchRoute && matchStatus;
+
+    const searchLower = searchQuery.toLowerCase();
+    const matchSearch =
+      s.shopName.toLowerCase().includes(searchLower) ||
+      String(s.serialNumber).includes(searchLower);
+
+    return matchRoute && matchStatus && matchSearch;
   });
 
-  // 🔥 NAYA: Drag & Drop Handlers
   const handleDragStart = (e, index) => {
     if (!routeFilter) {
       e.preventDefault();
@@ -156,7 +164,7 @@ const Shops = () => {
   };
 
   const handleDragOver = (e) => {
-    e.preventDefault(); // allow drop
+    e.preventDefault();
   };
 
   const handleDrop = async (index) => {
@@ -165,11 +173,9 @@ const Shops = () => {
     const newList = [...filteredShopsList];
     const draggedItem = newList[draggedIndex];
 
-    // Nayi tarteeb banao
     newList.splice(draggedIndex, 1);
     newList.splice(index, 0, draggedItem);
 
-    // Unhi serial numbers ko nai tarteeb mein lagao taake db mein sequence theek rahay
     const existingSerials = filteredShopsList
       .map((s) => s.serialNumber)
       .sort((a, b) => a - b);
@@ -178,7 +184,6 @@ const Shops = () => {
       serialNumber: existingSerials[i],
     }));
 
-    // Foran screen par update karo (Optimistic Update)
     setShopsList((prev) => {
       const prevCopy = [...prev];
       updatedShops.forEach((updated) => {
@@ -193,7 +198,6 @@ const Shops = () => {
     setDraggedIndex(null);
     setLoading(true);
 
-    // Background mein DB update karo
     try {
       await Promise.all(
         updatedShops.map((shop) =>
@@ -231,6 +235,18 @@ const Shops = () => {
         <div
           className={`flex flex-wrap items-center gap-3 w-full lg:w-auto ${language === "ur" ? "flex-row-reverse" : ""}`}
         >
+          {/* 🔥 NAYA: Search Bar Input */}
+          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg flex-1 md:flex-none w-full md:w-48">
+            <Search size={16} className="text-gray-400" />
+            <input
+              type="text"
+              placeholder={t("Search Shop...")}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={`bg-transparent outline-none text-sm text-gray-700 w-full placeholder-gray-400 ${language === "ur" ? "text-right" : ""}`}
+            />
+          </div>
+
           <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg flex-1 md:flex-none">
             <Filter size={16} className="text-purple-500" />
             <select
@@ -274,7 +290,6 @@ const Shops = () => {
         </div>
       </div>
 
-      {/* 🔥 NAYA: Form in a Modal (Popup) */}
       {showForm && user?.role === "Admin" && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
           <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto transform transition-all">
@@ -474,7 +489,9 @@ const Shops = () => {
                 filteredShopsList.map((shop, index) => (
                   <tr
                     key={shop._id || shop.id}
-                    draggable={!!routeFilter && user?.role === "Admin"}
+                    draggable={
+                      !!routeFilter && user?.role === "Admin" && !searchQuery
+                    }
                     onDragStart={(e) => handleDragStart(e, index)}
                     onDragOver={handleDragOver}
                     onDrop={() => handleDrop(index)}
@@ -490,15 +507,16 @@ const Shops = () => {
                       className={`px-4 py-3 ${language === "ur" ? "text-right" : "text-left"}`}
                     >
                       <div className="flex items-center gap-2 font-black text-indigo-700 text-lg">
-                        {/* Drag Handle Icon */}
-                        {routeFilter && user?.role === "Admin" && (
-                          <span
-                            className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-indigo-600"
-                            title="Drag to reorder"
-                          >
-                            <GripVertical size={20} />
-                          </span>
-                        )}
+                        {routeFilter &&
+                          user?.role === "Admin" &&
+                          !searchQuery && (
+                            <span
+                              className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-indigo-600"
+                              title="Drag to reorder"
+                            >
+                              <GripVertical size={20} />
+                            </span>
+                          )}
                         #{shop.serialNumber}
                       </div>
                     </td>
@@ -568,7 +586,9 @@ const Shops = () => {
           {filteredShopsList.map((shop, index) => (
             <div
               key={shop._id || shop.id}
-              draggable={!!routeFilter && user?.role === "Admin"}
+              draggable={
+                !!routeFilter && user?.role === "Admin" && !searchQuery
+              }
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(index)}
@@ -578,7 +598,7 @@ const Shops = () => {
                 className={`flex justify-between items-center border-b border-gray-100 pb-3 ${language === "ur" ? "flex-row-reverse" : ""}`}
               >
                 <div className="flex items-center gap-2">
-                  {routeFilter && user?.role === "Admin" && (
+                  {routeFilter && user?.role === "Admin" && !searchQuery && (
                     <span className="cursor-grab text-gray-400">
                       <GripVertical size={20} />
                     </span>
