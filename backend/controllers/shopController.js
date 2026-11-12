@@ -7,16 +7,14 @@ const createShop = async (req, res) => {
     const { shopName, ownerName, contact, address, assignedRoute, status } =
       req.body;
 
-    // 🔥 NAYA: Ab yeh poori database nahi, sirf uss specific route ki aakhri dukaan dhoonde ga
+    // Sirf uss specific route ki aakhri dukaan check karega
     const lastShop = await Shop.findOne({
       where: { assignedRoute },
       order: [["serialNumber", "DESC"]],
     });
 
-    // Naye route ki pehli dukaan ka default number 1 hoga
     let nextSerialNumber = 1;
 
-    // Agar us route mein pehle se dukaanein hain, toh us route ke aakhri number mein +1 kar do
     if (lastShop && lastShop.serialNumber > 0) {
       nextSerialNumber = lastShop.serialNumber + 1;
     }
@@ -71,16 +69,12 @@ const getShops = async (req, res) => {
 
 const updateShop = async (req, res) => {
   try {
-    // 🔥 NAYA: Pehle wala security block hata diya gaya hai.
-    // Ab client apni marzi se edit form se serial number change kar sakega!
-
     const shop = await Shop.findByPk(req.params.id);
 
     if (!shop) {
       return res.status(404).json({ message: "Shop not found" });
     }
 
-    // Dynamic data update
     Object.keys(req.body).forEach((key) => {
       shop[key] = req.body[key];
     });
@@ -109,4 +103,44 @@ const deleteShop = async (req, res) => {
   }
 };
 
-module.exports = { createShop, getShops, updateShop, deleteShop };
+// 🔥 NAYA: Purani tamam dukaano ke serial numbers ko har route ke hisaab se 1, 2, 3... tarteeb dene ka function
+const fixSerialNumbers = async (req, res) => {
+  try {
+    const allShops = await Shop.findAll({
+      order: [["serialNumber", "ASC"]],
+    });
+
+    const routeCounters = {};
+
+    for (const shop of allShops) {
+      const routeKey = shop.assignedRoute
+        ? String(shop.assignedRoute)
+        : "unassigned";
+      if (!routeCounters[routeKey]) {
+        routeCounters[routeKey] = 1;
+      } else {
+        routeCounters[routeKey] += 1;
+      }
+
+      shop.serialNumber = routeCounters[routeKey];
+      await shop.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message:
+        "Tamam routes ki dukaano ke serial numbers 1, 2, 3... se bilkul theek tarteeb mein set ho gaye hain!",
+      totalUpdated: allShops.length,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = {
+  createShop,
+  getShops,
+  updateShop,
+  deleteShop,
+  fixSerialNumbers,
+};
